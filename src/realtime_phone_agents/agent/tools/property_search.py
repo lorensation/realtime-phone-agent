@@ -1,46 +1,34 @@
 import json
+
 from langchain.tools import tool
-from realtime_phone_agents.infrastructure.superlinked.service import get_property_search_service
+
+from realtime_phone_agents.infrastructure.superlinked.service import (
+    get_knowledge_search_service,
+)
+
+
+async def _search_hotel_kb(query: str, limit: int = 3) -> str:
+    knowledge_service = get_knowledge_search_service()
+    response = await knowledge_service.search_knowledge(query=query, limit=limit)
+    return json.dumps(response, indent=2, ensure_ascii=False)
 
 
 @tool
 def search_property_mock_tool(location: str) -> str:
-    """Retrieve real estate details for properties in a given location."""
+    """Retrieve placeholder hotel details for a given location."""
     return (
-        "I found one apartment in that area. It features 3 rooms, "
-        "2 bathrooms, and a beautifully designed living room."
+        "Blue Sardine Altea is a boutique accommodation near the sea and the old town. "
+        "Use the real hotel knowledge tool for confirmed information."
     )
 
-@tool
-async def search_property_tool(query: str, limit: int = 1) -> str:
-    """Search for real estate properties using natural language queries.
-    
-    This tool performs semantic search over a property database, allowing you to find
-    properties based on user requirements like location, price, bedrooms, amenities, and more.
-    The search understands natural language and can handle complex queries with multiple criteria.
-    
-    Examples of good queries:
-        - "3 bedroom house in downtown under 500k"
-        - "apartment with pool near beach, 2 bedrooms"
-        - "modern condo in San Francisco with parking"
-        - "family home with large backyard, good schools"
-    
-    Args:
-        query: Natural language description of the property requirements. Can include
-               location, price range, number of bedrooms/bathrooms, amenities,
-               property type, and other features.
-        limit: Maximum number of matching properties to return (default: 1).
-               Use higher values when the user wants to compare multiple options.
-    
-    Returns:
-        A formatted string containing details of matching properties, including:
-        address, price, bedrooms, bathrooms, square footage, and key features.
-        Returns an empty or error message if no properties match the criteria.
-    """
-    property_search_service = get_property_search_service()
-    properties = await property_search_service.search_properties(query, limit)
 
-    if not properties:
-        return "No properties found matching the criteria."
-    
-    return json.dumps(properties, indent=2)
+@tool
+async def search_hotel_kb_tool(query: str, limit: int = 3) -> str:
+    """Search the Blue Sardine Altea hotel knowledge base with guardrails and sources."""
+    return await _search_hotel_kb(query=query, limit=limit)
+
+
+@tool
+async def search_property_tool(query: str, limit: int = 3) -> str:
+    """Backward compatible alias for the hotel knowledge search tool."""
+    return await _search_hotel_kb(query=query, limit=limit)

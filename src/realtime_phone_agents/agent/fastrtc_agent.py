@@ -7,7 +7,7 @@ from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import InMemorySaver
 from loguru import logger
 
-from realtime_phone_agents.agent.tools.property_search import search_property_tool
+from realtime_phone_agents.agent.tools.property_search import search_hotel_kb_tool
 from realtime_phone_agents.agent.utils import model_has_tool_calls
 from realtime_phone_agents.config import settings
 from realtime_phone_agents.voice import get_sound_effect
@@ -15,18 +15,29 @@ from realtime_phone_agents.voice import get_sound_effect
 AudioChunk = Tuple[int, np.ndarray]  # (sample_rate, samples)
 
 DEFAULT_SYSTEM_PROMPT = """
-Your name is Lisa, and you are a real estate assistant working for The Neural Maze real estate company.
-Your role is to provide short, clear, concrete, and summarised information about apartments.
-You must use the search_property_tool whenever you need property details.
+Your name is Blue Sardine Assistant, and you help guests of Blue Sardine Altea.
+Your role is to answer guest questions about rooms, services, policies, parking, location, and orientative pricing.
+You must use the search_hotel_kb_tool whenever you need factual hotel information.
+
+Trust and policy rules:
+Use only facts from the tool or from the user's input.
+Prefer official information over everything else.
+Treat internal_unvalidated pricing as orientative only.
+Treat third_party room type details as unconfirmed and say they require direct confirmation.
+If the tool says something is not confirmed, say so clearly and offer the phone or email contact.
+If the guest asks for pricing without exact stay dates, ask for exact dates first.
+If no booking engine is available, describe prices as orientative starting prices only.
+If a policy blocks a request, explain it briefly and offer a nearby alternative when possible.
 
 Communication rules:
 Use only plain text, suitable for phone transcription.
 Do not use emojis, asterisks, bullet points, or any special formatting.
-Write all numbers fully in words. For example, three instead of 3.
+Reply in Spanish by default. If the guest speaks in English or explicitly asks for English, reply in English.
 Keep answers concise, friendly, and easy to follow.
-Provide only factual information that comes from the tool or from the user's input.
+Include exact operational details when needed, such as check-in times, prices, address, phone, or email.
+Do not invent amenities, prices, availability, or room details.
 
-When presenting multiple apartments, separate them with simple sentences, maintaining clarity and brevity.
+When presenting multiple room options, separate them with simple sentences, maintaining clarity and brevity.
 """.strip()
 
 
@@ -41,13 +52,13 @@ class FastRTCAgent:
 
     def __init__(
         self,
-        tool_use_message: str = "Let me look for that in the system",
+        tool_use_message: str = "Estoy revisando la informacion del hotel",
         sound_effect_seconds: float = 3.0,
         stt_model=None,
         tts_model=None,
         voice_effect=None,
         thread_id: str = "default",
-        fallback_message: str = "I'm sorry, I couldn't find anything useful in the system.",
+        fallback_message: str = "No tengo ese dato confirmado ahora mismo. Puedes confirmarlo con el alojamiento por telefono o email.",
         system_prompt: str | None = None,
         tools: List | None = None,
     ):
@@ -95,7 +106,7 @@ class FastRTCAgent:
 
         Args:
             system_prompt: Custom system prompt (defaults to DEFAULT_SYSTEM_PROMPT)
-            tools: List of tools (defaults to [search_property_mock_tool])
+            tools: List of tools (defaults to the hotel knowledge search tool)
 
         Returns:
             Configured LangChain agent
@@ -106,7 +117,7 @@ class FastRTCAgent:
         )
 
         system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
-        tools = tools or [search_property_tool]
+        tools = tools or [search_hotel_kb_tool]
 
         agent = create_agent(
             llm,

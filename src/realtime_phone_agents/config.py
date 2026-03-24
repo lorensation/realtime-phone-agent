@@ -22,10 +22,21 @@ class OpenAISettings(BaseModel):
 # --- Superlinked Configuration ---
 class SuperlinkedSettings(BaseModel):
     embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", description="Embedding Model to use for Superlinked")
-    sqft_min_value: int = Field(default=20, description="Minimum value for appartment size in square feet")
-    sqft_max_value: int = Field(default=2000, description="Maximum value for appartment size in square feet")
-    price_min_value: int = Field(default=100000, description="Minimum value for appartment price in euros")
-    price_max_value: int = Field(default=10000000, description="Maximum value for appartment price in euros")
+    area_min_value: int = Field(default=0, description="Minimum indexed room area in square meters")
+    area_max_value: int = Field(default=100, description="Maximum indexed room area in square meters")
+    price_min_value: int = Field(default=0, description="Minimum indexed orientative price in euros")
+    price_max_value: int = Field(default=1000, description="Maximum indexed orientative price in euros")
+
+
+# --- Knowledge Base Configuration ---
+class KnowledgeBaseSettings(BaseModel):
+    default_bundle_path: str = Field(
+        default="data/blue_sardine_kb/2026-03-24",
+        description="Default versioned knowledge bundle path to auto-ingest at startup",
+    )
+    auto_ingest_default_bundle: bool = Field(
+        default=True, description="Automatically ingest the default knowledge bundle at startup"
+    )
 
 # --- Qdrant Configuration ---
 class QdrantSettings(BaseModel):
@@ -40,6 +51,7 @@ class Settings(BaseSettings):
     groq: GroqSettings = Field(default_factory=GroqSettings)
     openai: OpenAISettings = Field(default_factory=OpenAISettings)
     superlinked: SuperlinkedSettings = Field(default_factory=SuperlinkedSettings)
+    knowledge_base: KnowledgeBaseSettings = Field(default_factory=KnowledgeBaseSettings)
     qdrant: QdrantSettings = Field(default_factory=QdrantSettings)
     
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(

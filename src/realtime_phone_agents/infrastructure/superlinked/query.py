@@ -1,63 +1,58 @@
 from superlinked import framework as sl
 
-from realtime_phone_agents.config import settings
-from realtime_phone_agents.infrastructure.superlinked.index import property_index, property_schema, description_space, size_space, price_space
-from realtime_phone_agents.infrastructure.superlinked.constants import NEIGHBORHOODS
-
-
-openai_config = sl.OpenAIClientConfig(
-    api_key=settings.openai.api_key, model=settings.openai.model
+from realtime_phone_agents.infrastructure.superlinked.constants import (
+    ENTITY_TYPES,
+    SOURCE_PRIORITIES,
+    SUPPORTED_LANGUAGES,
+    VERIFICATION_STATES,
+)
+from realtime_phone_agents.infrastructure.superlinked.index import (
+    body_space,
+    knowledge_index,
+    knowledge_schema,
+    title_space,
 )
 
-property_search_query = (
+
+knowledge_search_query = (
     sl.Query(
-        property_index,
+        knowledge_index,
         weights={
-            description_space: sl.Param("description_weight"),
-            size_space: sl.Param("size_weight"),
-            price_space: sl.Param("price_weight"),
+            title_space: sl.Param("title_weight", default=1.0),
+            body_space: sl.Param("body_weight", default=1.2),
         },
     )
-    .find(property_schema)
-    .with_natural_query(sl.Param("natural_query"), openai_config)
-    .similar(
-        description_space,
-        sl.Param(
-            "description_query",
-            description="The user's natural language query for property search.",
-        ),
+    .find(knowledge_schema)
+    .similar(title_space, sl.Param("title_query"))
+    .similar(body_space, sl.Param("body_query"))
+    .filter(
+        knowledge_schema.entity_type
+        == sl.Param("entity_type", options=ENTITY_TYPES)
     )
     .filter(
-        property_schema.location 
-        == sl.Param(
-            "location",
-            description="Used to filter appartments by neighborhood",
-            options=NEIGHBORHOODS
-        ))
+        knowledge_schema.room_type_id
+        == sl.Param("room_type_id")
+    )
     .filter(
-        property_schema.rooms 
-        >= sl.Param(
-            "min_rooms",
-            description="Used to find apartments with a room count equal to or greater than the specified number"
-        ))
+        knowledge_schema.language
+        == sl.Param("language", options=SUPPORTED_LANGUAGES)
+    )
     .filter(
-        property_schema.baths 
-        >= sl.Param(
-            "min_baths",
-            description="Used to find apartments with a bath count equal to or greater than the specified number"
-        ))
+        knowledge_schema.verification_state
+        == sl.Param("verification_state", options=VERIFICATION_STATES)
+    )
     .filter(
-        property_schema.sqft 
-        >= sl.Param(
-            "sqft_bigger_than",
-            description="Used to find appartments with square feet equal to or greather than the specified number"
-        ))
+        knowledge_schema.source_priority
+        == sl.Param("source_priority", options=SOURCE_PRIORITIES)
+    )
     .filter(
-        property_schema.price 
-        <= sl.Param(
-            "price_smaller_than",
-            description="Used to find appartments with price less than the specified number"
-        ))
-    .limit(sl.Param("limit"))
+        knowledge_schema.area_sqm
+        >= sl.Param("area_min")
+    )
+    .filter(
+        knowledge_schema.base_price_eur
+        <= sl.Param("price_max")
+    )
+    .limit(sl.Param("limit", default=3))
     .select_all()
 )

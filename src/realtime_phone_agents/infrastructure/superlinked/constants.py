@@ -1,12 +1,17 @@
-NEIGHBORHOODS = ['Chueca-Justicia', 'Imperial', 'Malasaña-Universidad', 'Hortaleza',
-       'Centro', 'Chamartín', 'Ciudad Lineal', 'Barrio de Salamanca',
-       'Chamberí', 'Fuencarral', 'San Blas', 'Goya', 'Palacio', 'Lista',
-       'Ventas', 'Moncloa', 'Huertas-Cortes', 'Vallehermoso',
-       'Prosperidad', 'Pinar del Rey', 'Argüelles', 'Tetuán',
-       'Nueva España', 'Ciudad Universitaria', 'Ciudad Jardín',
-       'Valdeacederas', 'Recoletos', 'El Cañaveral', 'Palos de Moguer',
-       'Bernabéu-Hispanoamérica', 'Retiro', 'Castellana', 'Amposta',
-       'Nuevos Ministerios-Ríos Rosas', 'Lavapiés-Embajadores',
-       'Costillares', 'Trafalgar', 'Buena Vista', 'El Viso', 'Latina',
-       'Moratalaz', 'El Plantío', 'Cuatro Caminos', 'Butarque', 'Sol',
-       'Canillas', 'Fuente del Berro']
+from realtime_phone_agents.knowledge.models import SourcePriority, VerificationState
+
+
+ENTITY_TYPES = [
+    "overview",
+    "location",
+    "contact",
+    "parking",
+    "service",
+    "policy",
+    "room_type",
+    "pricing",
+]
+
+SOURCE_PRIORITIES = [priority.value for priority in SourcePriority]
+VERIFICATION_STATES = [state.value for state in VerificationState]
+SUPPORTED_LANGUAGES = ["es-ES", "en-US"]

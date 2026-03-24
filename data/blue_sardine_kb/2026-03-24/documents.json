@@ -1,0 +1,74 @@
+{
+  "documents": [
+    {
+      "doc_id": "bs_overview_es",
+      "language": "es-ES",
+      "title": "Resumen del alojamiento y propuesta de valor",
+      "body": "Alojamiento boutique restaurado en un antiguo barrio de pescadores, cerca del mar y al inicio del casco historico. Ofrece habitaciones y apartamentos con enfoque en confort moderno, detalle en diseno y apoyo tecnologico para la estancia.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/"
+        ],
+        "tags": [
+          "overview",
+          "location",
+          "boutique"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_services_es",
+      "language": "es-ES",
+      "title": "Servicios, limpieza y equipamiento",
+      "body": "Servicios destacados: atencion personalizada, apoyo tecnologico para aperturas y registros, informacion turistica y opciones para celebraciones. Limpieza: servicio de limpieza, amenities, toallas, sabanas y almohadas confortables. Equipamiento: wifi gratuito, climatizacion frio-calor, caja fuerte, nevera o minibar, Smart TV, taquillas y almacenamiento de equipaje.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/"
+        ],
+        "tags": [
+          "services",
+          "housekeeping",
+          "amenities",
+          "facilities"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_parking_es",
+      "language": "es-ES",
+      "title": "Parking",
+      "body": "Hay parking publico gratuito aproximadamente a 200 metros andando. En condiciones generales se indica como referencia Calle La Mar 98, detras de la estacion de tren, y que no hay responsabilidad por robos o danos en el parking.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/",
+          "https://bluesardinealtea.com/en/general-conditions/"
+        ],
+        "tags": [
+          "parking",
+          "location"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_policies_es",
+      "language": "es-ES",
+      "title": "Condiciones generales: horarios y normas",
+      "body": "Check-in a partir de las 15:00 y check-out antes de las 12:00. Hay taquillas gratuitas para equipaje y un sistema para dejar llaves. Alojamiento orientado a adultos y ninos mayores de 10. Espacio sin humo. No se permiten mascotas. No se permiten bicicletas ni patinetes electricos dentro. Se aplican cargos por danos o perdida, por ejemplo toallas.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/en/general-conditions/"
+        ],
+        "tags": [
+          "policies",
+          "checkin",
+          "checkout",
+          "rules"
+        ]
+      }
+    }
+  ]
+}

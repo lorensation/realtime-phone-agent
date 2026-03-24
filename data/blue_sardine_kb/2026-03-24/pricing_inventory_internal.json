@@ -1,0 +1,59 @@
+{
+  "pricing_and_inventory_internal": {
+    "currency": "EUR",
+    "pricing_model": "seasonal",
+    "status": "client_provided_requires_validation",
+    "inventory_breakdown": [
+      {
+        "room_type_id": "double_economic",
+        "units": 2,
+        "base_price_eur": 70
+      },
+      {
+        "room_type_id": "standard_room",
+        "units": 11,
+        "base_price_eur": 80
+      },
+      {
+        "room_type_id": "superior_room",
+        "units": 3,
+        "base_price_eur": 100
+      },
+      {
+        "room_type_id": "premium_room",
+        "units": 1,
+        "base_price_eur": 150
+      },
+      {
+        "room_type_id": "studio_with_terrace",
+        "units": 1,
+        "base_price_eur": 160
+      },
+      {
+        "room_type_id": "blue_apartment",
+        "units": 1,
+        "base_price_eur": 175
+      },
+      {
+        "room_type_id": "sardine_apartment",
+        "units": 1,
+        "base_price_eur": 190
+      }
+    ],
+    "inventory_sum_units": 20,
+    "inventory_expected_units_external_hint": 21,
+    "inventory_gap_units": 1,
+    "season_definitions_placeholder": [
+      {
+        "season_id": "low",
+        "date_ranges": [],
+        "price_multiplier": 1.0
+      },
+      {
+        "season_id": "high",
+        "date_ranges": [],
+        "price_multiplier": 1.0
+      }
+    ]
+  }
+}

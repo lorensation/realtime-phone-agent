@@ -1,0 +1,175 @@
+{
+  "room_types": [
+    {
+      "id": "standard_room",
+      "display_name_es": "Habitacion Doble Estandar",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": 15,
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "zona_de_estar",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "wifi"
+      ]
+    },
+    {
+      "id": "superior_room",
+      "display_name_es": "Habitacion Doble Superior",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": 18,
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "zona_de_estar",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "wifi"
+      ]
+    },
+    {
+      "id": "premium_room",
+      "display_name_es": "Habitacion Doble con Terraza",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": null,
+      "highlights": [
+        "terraza_independiente",
+        "vistas_mar_y_casco_antiguo"
+      ],
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "zona_de_estar",
+        "wifi",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "hervidor",
+        "cafetera"
+      ]
+    },
+    {
+      "id": "studio_with_terrace",
+      "display_name_es": "Estudio con Terraza",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": 30,
+      "highlights": [
+        "balcon",
+        "terraza_principal",
+        "estancias_largas"
+      ],
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "escritorio",
+        "zona_de_estar",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "hervidor",
+        "microondas",
+        "plancha",
+        "wifi"
+      ]
+    },
+    {
+      "id": "blue_apartment",
+      "display_name_es": "Apartamento Blue",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": 50,
+      "layout": [
+        "dormitorio",
+        "cocina",
+        "salon_comedor",
+        "bano"
+      ],
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "escritorio",
+        "zona_de_estar",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "hervidor",
+        "kitchenette",
+        "menaje",
+        "microondas",
+        "lavadora",
+        "plancha",
+        "wifi"
+      ]
+    },
+    {
+      "id": "sardine_apartment",
+      "display_name_es": "Apartamento Sardine",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": 50,
+      "layout": [
+        "dormitorio",
+        "cocina",
+        "salon_comedor",
+        "bano",
+        "balcon"
+      ],
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "escritorio",
+        "zona_de_estar",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "hervidor",
+        "kitchenette",
+        "menaje",
+        "microondas",
+        "lavadora",
+        "plancha",
+        "wifi"
+      ]
+    }
+  ],
+  "room_type_extensions": [
+    {
+      "id": "double_economic",
+      "display_name_es": "Habitacion Doble Economica",
+      "source": "metabuscadores_otas",
+      "notes": "Aparece como tipologia en canales externos, pero no esta descrita en la web principal. Requiere ficha interna con m2, amenities, fotos y reglas.",
+      "needs_internal_validation": true
+    }
+  ]
+}

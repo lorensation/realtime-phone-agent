@@ -1,0 +1,15 @@
+{
+  "kb_version": "2026-03-24",
+  "generated_at": "2026-03-24T00:00:00Z",
+  "property_name": "Blue Sardine Altea",
+  "primary_domain": "bluesardinealtea.com",
+  "responsible": "Codex migration bundle",
+  "confidence": "official_plus_internal_unvalidated_pricing",
+  "files": {
+    "documents.json": "d0a438a6f8410eb2d24da693482c7ad83deca49a6f9651cb1a152bbdd0dfb92d",
+    "faq.json": "908c69524337238a858a22abe0397c57f3a653bb164264aed008868fa9222f1c",
+    "hotel.json": "2f87720f05aec8156c60ffd86bf7340230859dd35b50f140aa156ddca67e9ce6",
+    "pricing_inventory_internal.json": "7763e09177e660625368fc7c46d7cf7f01bd499c2a7787e6e05e49bac1a58520",
+    "room_types.json": "df6aecb3d40415824b5eed560cc34740da130f78a513da95e37222637c00f4da"
+  }
+}

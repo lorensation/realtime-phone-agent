@@ -1,0 +1,41 @@
+{
+  "faq": [
+    {
+      "q": "A que hora es el check-in y el check-out?",
+      "a": "El check-in es a partir de las 15:00 y el check-out debe hacerse antes de las 12:00.",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "q": "Hay parking?",
+      "a": "No hay parking dentro del alojamiento, pero hay parking publico gratuito a unos 200 metros andando. En condiciones generales se menciona Calle La Mar 98, detras de la estacion de tren.",
+      "sources": [
+        "https://bluesardinealtea.com/",
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "q": "Se admiten mascotas?",
+      "a": "No, no se permiten mascotas.",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "q": "Es un alojamiento solo para adultos?",
+      "a": "Segun las condiciones generales, esta orientado a adultos y se admiten ninos a partir de 10 anos.",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "q": "Que incluye el equipamiento basico en habitaciones?",
+      "a": "De forma general se publica wifi gratuito, climatizacion frio-calor, caja fuerte, nevera o minibar y Smart TV. En cada tipologia se listan tambien TV, minibar y amenities de bano.",
+      "sources": [
+        "https://bluesardinealtea.com/",
+        "https://bluesardinealtea.com/en/standard-room/"
+      ]
+    }
+  ]
+}
