@@ -1,0 +1,11 @@
+data/
+.venv/
+.env
+.DS_Store
+.vscode/
+.ruff_cache/
+notebooks/
+.gradio/
+docs/
+scripts/
+static/
