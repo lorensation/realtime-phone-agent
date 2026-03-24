@@ -67,6 +67,12 @@ Once you have created the API key, you can copy it and paste it into an `.env` f
 
 As for the `GROQ__BASE_URL` and the `GROQ__MODEL`, you can leave the defaults from the `.env.example`.
 
+### OpenAI
+
+To leverage Superlinked's natural queries, we'll make use of OpenAI models (in particular, `gpt-4o-mini`).
+
+Simply add your OpenAI API Key to the `OPENAI__API_KEY` var in your `.env` file.
+
 # 5. Twilio 
 
 You can hook up a Stream to a SIP provider like Twilio, which lets you give your app its own phone number.

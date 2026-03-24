@@ -1,6 +1,3 @@
-# src/realtime_phone_agents/agent/fastrtc_agent.py
-
-import asyncio
 from typing import AsyncIterator, List, Optional, Tuple
 
 import numpy as np
@@ -10,7 +7,7 @@ from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import InMemorySaver
 from loguru import logger
 
-from realtime_phone_agents.agent.tools.property_search import search_property_mock_tool
+from realtime_phone_agents.agent.tools.property_search import search_property_tool
 from realtime_phone_agents.agent.utils import model_has_tool_calls
 from realtime_phone_agents.config import settings
 from realtime_phone_agents.voice import get_sound_effect
@@ -18,9 +15,18 @@ from realtime_phone_agents.voice import get_sound_effect
 AudioChunk = Tuple[int, np.ndarray]  # (sample_rate, samples)
 
 DEFAULT_SYSTEM_PROMPT = """
-Your name is Lisa, and you work for The Neural Maze real estate company. 
-Your task is to provide information about specific apartments using the `search_property_mock_tool`.
-Don't use asterisks or emojis, as you are engaged in a phone call. Just return short and informative responses.
+Your name is Lisa, and you are a real estate assistant working for The Neural Maze real estate company.
+Your role is to provide short, clear, concrete, and summarised information about apartments.
+You must use the search_property_tool whenever you need property details.
+
+Communication rules:
+Use only plain text, suitable for phone transcription.
+Do not use emojis, asterisks, bullet points, or any special formatting.
+Write all numbers fully in words. For example, three instead of 3.
+Keep answers concise, friendly, and easy to follow.
+Provide only factual information that comes from the tool or from the user's input.
+
+When presenting multiple apartments, separate them with simple sentences, maintaining clarity and brevity.
 """.strip()
 
 
@@ -100,7 +106,7 @@ class FastRTCAgent:
         )
 
         system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
-        tools = tools or [search_property_mock_tool]
+        tools = tools or [search_property_tool]
 
         agent = create_agent(
             llm,
@@ -191,7 +197,7 @@ class FastRTCAgent:
         final_text: str | None = None
 
         # Stream LangChain agent updates
-        for chunk in self._react_agent.stream(
+        async for chunk in self._react_agent.astream(
             {"messages": [{"role": "user", "content": transcription}]},
             {"configurable": {"thread_id": self._thread_id}},
             stream_mode="updates",
@@ -209,9 +215,6 @@ class FastRTCAgent:
                     if self._sound_effect_seconds > 0:
                         async for effect_chunk in self._play_sound_effect():
                             yield effect_chunk
-
-                    # Allow event loop to run
-                    await asyncio.sleep(0)
 
                 # Capture final text from model response
                 if step == "model":
