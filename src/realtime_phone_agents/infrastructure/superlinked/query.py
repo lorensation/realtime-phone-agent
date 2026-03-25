@@ -26,16 +26,11 @@ knowledge_search_query = (
     .similar(title_space, sl.Param("title_query"))
     .similar(body_space, sl.Param("body_query"))
     .filter(
-        knowledge_schema.entity_type
-        == sl.Param("entity_type", options=ENTITY_TYPES)
+        knowledge_schema.entity_type == sl.Param("entity_type", options=ENTITY_TYPES)
     )
+    .filter(knowledge_schema.room_type_id == sl.Param("room_type_id"))
     .filter(
-        knowledge_schema.room_type_id
-        == sl.Param("room_type_id")
-    )
-    .filter(
-        knowledge_schema.language
-        == sl.Param("language", options=SUPPORTED_LANGUAGES)
+        knowledge_schema.language == sl.Param("language", options=SUPPORTED_LANGUAGES)
     )
     .filter(
         knowledge_schema.verification_state
@@ -45,14 +40,8 @@ knowledge_search_query = (
         knowledge_schema.source_priority
         == sl.Param("source_priority", options=SOURCE_PRIORITIES)
     )
-    .filter(
-        knowledge_schema.area_sqm
-        >= sl.Param("area_min")
-    )
-    .filter(
-        knowledge_schema.base_price_eur
-        <= sl.Param("price_max")
-    )
+    .filter(knowledge_schema.area_sqm >= sl.Param("area_min"))
+    .filter(knowledge_schema.base_price_eur <= sl.Param("price_max"))
     .limit(sl.Param("limit", default=3))
     .select_all()
 )

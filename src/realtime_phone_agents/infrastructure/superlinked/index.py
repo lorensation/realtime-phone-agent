@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import os
 from pathlib import Path
 
@@ -26,6 +28,7 @@ class Knowledge(sl.Schema):
     version: sl.String
     sources: sl.StringList
     tags: sl.StringList
+
 
 knowledge_schema = Knowledge()
 

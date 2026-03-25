@@ -1,0 +1,18 @@
+FROM ghcr.io/speaches-ai/speaches:latest-cuda
+
+ARG FASTER_WHISPER_MODEL=Systran/faster-whisper-large-v3
+
+EXPOSE 8000
+
+ENV HF_HOME=/home/ubuntu/.cache/huggingface
+ENV TRANSFORMERS_CACHE=/home/ubuntu/.cache/huggingface/hub
+
+RUN mkdir -p /home/ubuntu/.cache/huggingface/hub
+
+RUN echo "Downloading model: ${FASTER_WHISPER_MODEL}" && \
+    huggingface-cli download ${FASTER_WHISPER_MODEL} --local-dir-use-symlinks False && \
+    echo "Model downloaded successfully"
+
+ENV DEFAULT_MODEL=${FASTER_WHISPER_MODEL}
+ENV COMPUTE_TYPE=int8
+ENV LOOPBACK_HOST_URL=http://localhost:8000

@@ -4,7 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from realtime_phone_agents.infrastructure.superlinked.service import KnowledgeSearchService
+from realtime_phone_agents.infrastructure.superlinked.service import (
+    KnowledgeSearchService,
+)
 from realtime_phone_agents.knowledge.intent_router import (
     detect_intent,
     extract_room_type_id,
@@ -22,7 +24,8 @@ class LoaderTests(unittest.TestCase):
         bundle = load_knowledge_bundle(BUNDLE_PATH)
         self.assertEqual(bundle.manifest.kb_version, "2026-03-24")
         self.assertEqual(
-            bundle.pricing_inventory.pricing_and_inventory_internal.inventory_gap_units, 1
+            bundle.pricing_inventory.pricing_and_inventory_internal.inventory_gap_units,
+            1,
         )
         self.assertIn("standard_room", bundle.all_room_type_ids)
         self.assertIn("double_economic", bundle.all_room_type_ids)
@@ -34,9 +37,7 @@ class LoaderTests(unittest.TestCase):
             manifest_path = target / "manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["files"]["hotel.json"] = "deadbeef"
-            manifest_path.write_text(
-                json.dumps(manifest, indent=2), encoding="utf-8"
-            )
+            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
             with self.assertRaises(ValueError):
                 load_knowledge_bundle(target)
@@ -52,10 +53,14 @@ class LoaderTests(unittest.TestCase):
             ] = "unknown_room"
             pricing_path.write_text(json.dumps(pricing, indent=2), encoding="utf-8")
 
-            hotel_checksum = json.loads((target / "manifest.json").read_text(encoding="utf-8"))
+            hotel_checksum = json.loads(
+                (target / "manifest.json").read_text(encoding="utf-8")
+            )
             from realtime_phone_agents.knowledge.loader import sha256_file
 
-            hotel_checksum["files"]["pricing_inventory_internal.json"] = sha256_file(pricing_path)
+            hotel_checksum["files"]["pricing_inventory_internal.json"] = sha256_file(
+                pricing_path
+            )
             (target / "manifest.json").write_text(
                 json.dumps(hotel_checksum, indent=2), encoding="utf-8"
             )
@@ -92,7 +97,9 @@ class NormalizationTests(unittest.TestCase):
 class IntentRouterTests(unittest.TestCase):
     def test_detect_intents(self):
         self.assertEqual(detect_intent("Se admiten mascotas?"), Intent.POLICIES)
-        self.assertEqual(detect_intent("Hay parking gratis?"), Intent.LOCATION_AND_PARKING)
+        self.assertEqual(
+            detect_intent("Hay parking gratis?"), Intent.LOCATION_AND_PARKING
+        )
         self.assertEqual(
             detect_intent("How much is the studio with terrace?"),
             Intent.AVAILABILITY_PRICING,
@@ -116,7 +123,9 @@ class IntentRouterTests(unittest.TestCase):
 class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.service = KnowledgeSearchService(None, None, None, None, force_in_memory=True)
+        cls.service = KnowledgeSearchService(
+            None, None, None, None, force_in_memory=True
+        )
         cls.service.ingest_knowledge_bundle(BUNDLE_PATH)
 
     async def test_policy_search_for_pets(self):
@@ -175,8 +184,13 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
             "Incluye 2 botellas de agua?", limit=3
         )
         self.assertTrue(
-            any("no esta confirmado" in note.lower() for note in response["guardrail_notes"])
-            or any("no confirma" in note.lower() for note in response["guardrail_notes"])
+            any(
+                "no esta confirmado" in note.lower()
+                for note in response["guardrail_notes"]
+            )
+            or any(
+                "no confirma" in note.lower() for note in response["guardrail_notes"]
+            )
         )
 
     async def test_english_query_keeps_policy_facts(self):

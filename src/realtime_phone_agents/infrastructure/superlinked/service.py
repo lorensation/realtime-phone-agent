@@ -10,7 +10,6 @@ from superlinked import framework as sl
 from realtime_phone_agents.config import settings
 from realtime_phone_agents.knowledge import (
     Intent,
-    SourcePriority,
     VerificationState,
     detect_intent,
     extract_area_sqm_hint,
@@ -22,8 +21,13 @@ from realtime_phone_agents.knowledge import (
     normalize_knowledge_bundle,
 )
 from realtime_phone_agents.knowledge.models import HotelKnowledgeBundle, KnowledgeEntry
-from realtime_phone_agents.infrastructure.superlinked.index import knowledge_index, knowledge_schema
-from realtime_phone_agents.infrastructure.superlinked.query import knowledge_search_query
+from realtime_phone_agents.infrastructure.superlinked.index import (
+    knowledge_index,
+    knowledge_schema,
+)
+from realtime_phone_agents.infrastructure.superlinked.query import (
+    knowledge_search_query,
+)
 
 
 class KnowledgeSearchService:
@@ -58,7 +62,9 @@ class KnowledgeSearchService:
         try:
             self._setup_with_qdrant()
         except Exception as exc:
-            logger.warning(f"Qdrant setup failed, falling back to InMemoryExecutor: {exc}")
+            logger.warning(
+                f"Qdrant setup failed, falling back to InMemoryExecutor: {exc}"
+            )
             self._setup_with_memory()
 
     def _setup_with_qdrant(self) -> None:
@@ -155,7 +161,10 @@ class KnowledgeSearchService:
             return "pricing"
         if intent == Intent.LOCATION_AND_PARKING:
             lowered_query = query.lower()
-            if any(keyword in lowered_query for keyword in ("parking", "aparc", "la mar", "station", "tren")):
+            if any(
+                keyword in lowered_query
+                for keyword in ("parking", "aparc", "la mar", "station", "tren")
+            ):
                 return "parking"
             return "location"
         return None
@@ -206,7 +215,10 @@ class KnowledgeSearchService:
             notes.append(
                 "La base publica no confirma botellas de agua de cortesia. Di que no esta confirmado y ofrece telefono o email."
             )
-        if resolved_intent == Intent.AVAILABILITY_PRICING and not has_explicit_stay_dates(query):
+        if (
+            resolved_intent == Intent.AVAILABILITY_PRICING
+            and not has_explicit_stay_dates(query)
+        ):
             notes.append(
                 "Pide fechas exactas antes de cotizar. Sin motor de reservas integrado, solo comparte precios orientativos."
             )
@@ -218,9 +230,14 @@ class KnowledgeSearchService:
             notes.append(
                 "Presenta cualquier precio interno como orientativo desde X EUR y recomienda confirmar en web o por contacto."
             )
-            logger.warning("Using internal_unvalidated pricing in hotel knowledge response")
+            logger.warning(
+                "Using internal_unvalidated pricing in hotel knowledge response"
+            )
 
-        if any(result["verification_state"] == VerificationState.THIRD_PARTY.value for result in results):
+        if any(
+            result["verification_state"] == VerificationState.THIRD_PARTY.value
+            for result in results
+        ):
             notes.append(
                 "Indica que esa tipologia proviene de canales externos y necesita confirmacion directa."
             )
@@ -243,7 +260,11 @@ class KnowledgeSearchService:
         if self.bundle is None:
             raise RuntimeError("No hotel knowledge bundle has been ingested")
 
-        resolved_intent = Intent(intent) if intent in {item.value for item in Intent} else detect_intent(query)
+        resolved_intent = (
+            Intent(intent)
+            if intent in {item.value for item in Intent}
+            else detect_intent(query)
+        )
         room_type_id = extract_room_type_id(query)
         area_hint = extract_area_sqm_hint(query)
         price_hint = extract_base_price_hint(query)

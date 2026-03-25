@@ -12,7 +12,9 @@ def _header_value(request: Request, header_name: str, fallback: str) -> str:
 
 
 def _build_telephone_twiml(request: Request, voice_path: str) -> str:
-    public_host = _header_value(request, "x-forwarded-host", request.headers.get("host", "localhost"))
+    public_host = _header_value(
+        request, "x-forwarded-host", request.headers.get("host", "localhost")
+    )
     public_scheme = _header_value(request, "x-forwarded-proto", request.url.scheme)
     websocket_scheme = "wss" if public_scheme == "https" else "ws"
     stream_url = f"{websocket_scheme}://{public_host}{voice_path}/telephone/handler"
@@ -29,7 +31,7 @@ def _build_telephone_twiml(request: Request, voice_path: str) -> str:
 def mount_voice_stream(app: FastAPI):
     """
     Mount the FastRTC agent voice stream to the application.
-    
+
     Args:
         app: FastAPI application instance
     """

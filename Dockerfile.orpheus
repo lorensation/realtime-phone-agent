@@ -1,0 +1,3 @@
+FROM ghcr.io/ggml-org/llama.cpp:server-cuda
+
+CMD ["--hf-repo", "PkmX/orpheus-3b-0.1-ft-Q8_0-GGUF", "--hf-file", "orpheus-3b-0.1-ft-q8_0.gguf", "-c", "0", "--n-gpu-layers", "-1"]

@@ -253,7 +253,9 @@ class HotelKnowledgeBundle(StrictModel):
     @property
     def all_room_type_ids(self) -> set[str]:
         canonical_ids = {room_type.id for room_type in self.room_types.room_types}
-        extension_ids = {room_type.id for room_type in self.room_types.room_type_extensions}
+        extension_ids = {
+            room_type.id for room_type in self.room_types.room_type_extensions
+        }
         return canonical_ids | extension_ids
 
     @property
@@ -272,13 +274,19 @@ class HotelKnowledgeBundle(StrictModel):
         if self.hotel.kb_version != self.manifest.kb_version:
             raise ValueError("hotel.kb_version must match manifest.kb_version")
         if self.hotel.source.primary_domain != self.manifest.primary_domain:
-            raise ValueError("manifest.primary_domain must match hotel.source.primary_domain")
+            raise ValueError(
+                "manifest.primary_domain must match hotel.source.primary_domain"
+            )
 
         room_type_ids = [room_type.id for room_type in self.room_types.room_types]
-        extension_ids = [room_type.id for room_type in self.room_types.room_type_extensions]
+        extension_ids = [
+            room_type.id for room_type in self.room_types.room_type_extensions
+        ]
         all_ids = room_type_ids + extension_ids
         if len(all_ids) != len(set(all_ids)):
-            raise ValueError("Room type ids must be unique across canonical and extension room types")
+            raise ValueError(
+                "Room type ids must be unique across canonical and extension room types"
+            )
 
         unknown_room_type_ids = {
             item.room_type_id

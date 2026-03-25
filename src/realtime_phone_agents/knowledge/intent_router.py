@@ -174,7 +174,9 @@ PRICE_PATTERN = re.compile(
 
 def normalize_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKD", text.lower())
-    return "".join(character for character in normalized if not unicodedata.combining(character))
+    return "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    )
 
 
 def build_room_type_aliases() -> dict[str, list[str]]:
@@ -199,7 +201,9 @@ def detect_intent(query: str) -> Intent | None:
         return Intent.SPECIAL_REQUESTS
     if any(keyword in normalized_query for keyword in POLICY_KEYWORDS):
         return Intent.POLICIES
-    if extract_room_type_id(normalized_query) or any(keyword in normalized_query for keyword in ROOM_KEYWORDS):
+    if extract_room_type_id(normalized_query) or any(
+        keyword in normalized_query for keyword in ROOM_KEYWORDS
+    ):
         return Intent.ROOM_SELECTION
     return None
 

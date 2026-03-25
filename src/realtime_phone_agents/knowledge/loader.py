@@ -44,25 +44,39 @@ def load_knowledge_bundle(bundle_path: str | Path) -> HotelKnowledgeBundle:
     if not base_path.exists():
         raise FileNotFoundError(f"Knowledge bundle path does not exist: {base_path}")
     if not base_path.is_dir():
-        raise NotADirectoryError(f"Knowledge bundle path must be a directory: {base_path}")
+        raise NotADirectoryError(
+            f"Knowledge bundle path must be a directory: {base_path}"
+        )
 
     manifest_path = base_path / "manifest.json"
     if not manifest_path.exists():
-        raise FileNotFoundError(f"Knowledge bundle manifest is missing: {manifest_path}")
+        raise FileNotFoundError(
+            f"Knowledge bundle manifest is missing: {manifest_path}"
+        )
 
     try:
         manifest = Manifest.model_validate(_load_json(manifest_path))
         hotel = HotelData.model_validate(_load_json(base_path / "hotel.json"))
-        room_types = RoomTypesData.model_validate(_load_json(base_path / "room_types.json"))
+        room_types = RoomTypesData.model_validate(
+            _load_json(base_path / "room_types.json")
+        )
         pricing_inventory = PricingInventoryData.model_validate(
             _load_json(base_path / "pricing_inventory_internal.json")
         )
         faq = FAQData.model_validate(_load_json(base_path / "faq.json"))
-        documents = DocumentsData.model_validate(_load_json(base_path / "documents.json"))
+        documents = DocumentsData.model_validate(
+            _load_json(base_path / "documents.json")
+        )
     except ValidationError as exc:
-        raise ValueError(f"Invalid knowledge bundle data in {base_path}: {exc}") from exc
+        raise ValueError(
+            f"Invalid knowledge bundle data in {base_path}: {exc}"
+        ) from exc
 
-    missing_files = [filename for filename in REQUIRED_BUNDLE_FILES if not (base_path / filename).exists()]
+    missing_files = [
+        filename
+        for filename in REQUIRED_BUNDLE_FILES
+        if not (base_path / filename).exists()
+    ]
     if missing_files:
         raise FileNotFoundError(
             f"Knowledge bundle is missing required files: {', '.join(sorted(missing_files))}"

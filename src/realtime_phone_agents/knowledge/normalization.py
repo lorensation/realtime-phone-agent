@@ -276,11 +276,20 @@ def _normalize_room_type_entries(bundle: HotelKnowledgeBundle) -> list[Knowledge
         details.append(f"hasta {room_type.occupancy.adults_max} adultos")
         details.append(f"cama {room_type.bed}")
         if room_type.layout:
-            details.append("distribucion: " + ", ".join(_humanize_token(token) for token in room_type.layout))
+            details.append(
+                "distribucion: "
+                + ", ".join(_humanize_token(token) for token in room_type.layout)
+            )
         if room_type.highlights:
-            details.append("destaca por " + ", ".join(_humanize_token(token) for token in room_type.highlights))
+            details.append(
+                "destaca por "
+                + ", ".join(_humanize_token(token) for token in room_type.highlights)
+            )
         if room_type.features:
-            details.append("incluye " + ", ".join(_humanize_token(token) for token in room_type.features))
+            details.append(
+                "incluye "
+                + ", ".join(_humanize_token(token) for token in room_type.features)
+            )
         entries.append(
             KnowledgeEntry(
                 id=f"room_type_{room_type.id}",
@@ -325,10 +334,14 @@ def _normalize_room_type_entries(bundle: HotelKnowledgeBundle) -> list[Knowledge
 def _normalize_pricing_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]:
     pricing = bundle.pricing_inventory.pricing_and_inventory_internal
     room_display_names = {
-        room_type.id: room_type.display_name_es for room_type in bundle.room_types.room_types
+        room_type.id: room_type.display_name_es
+        for room_type in bundle.room_types.room_types
     }
     room_display_names.update(
-        {room_type.id: room_type.display_name_es for room_type in bundle.room_types.room_type_extensions}
+        {
+            room_type.id: room_type.display_name_es
+            for room_type in bundle.room_types.room_type_extensions
+        }
     )
 
     entries = [
@@ -378,7 +391,9 @@ def _normalize_document_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeE
     entries: list[KnowledgeEntry] = []
     for document in bundle.documents.documents:
         entity_type = _classify_entity_type(
-            text=" ".join([document.title, document.body, " ".join(document.metadata.tags)])
+            text=" ".join(
+                [document.title, document.body, " ".join(document.metadata.tags)]
+            )
         )
         chunks = _split_body(document.body)
         for index, chunk in enumerate(chunks, start=1):
@@ -389,10 +404,14 @@ def _normalize_document_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeE
                     title=document.title,
                     body=chunk,
                     entity_type=entity_type,
-                    room_type_id=extract_room_type_id(document.title + " " + document.body),
+                    room_type_id=extract_room_type_id(
+                        document.title + " " + document.body
+                    ),
                     language=document.language,
                     source_priority=document.metadata.source_priority,
-                    verification_state=_priority_to_verification(document.metadata.source_priority),
+                    verification_state=_priority_to_verification(
+                        document.metadata.source_priority
+                    ),
                     version=bundle.manifest.kb_version,
                     sources=document.metadata.source_urls,
                     tags=document.metadata.tags,
@@ -433,7 +452,9 @@ def _entry_from_token_list(
     bundle: HotelKnowledgeBundle,
     tags: list[str],
 ) -> KnowledgeEntry:
-    body = body_prefix + ": " + ", ".join(_humanize_token(token) for token in tokens) + "."
+    body = (
+        body_prefix + ": " + ", ".join(_humanize_token(token) for token in tokens) + "."
+    )
     return KnowledgeEntry(
         id=entry_id,
         title=title,
@@ -464,18 +485,39 @@ def _priority_to_verification(priority: SourcePriority) -> VerificationState:
 
 def _classify_entity_type(text: str) -> str:
     normalized_text = re.sub(r"\s+", " ", text.lower())
-    if any(keyword in normalized_text for keyword in ("parking", "aparcamiento", "calle la mar")):
+    if any(
+        keyword in normalized_text
+        for keyword in ("parking", "aparcamiento", "calle la mar")
+    ):
         return "parking"
-    if any(keyword in normalized_text for keyword in ("direccion", "ubicacion", "casco historico", "mar", "playa")):
+    if any(
+        keyword in normalized_text
+        for keyword in ("direccion", "ubicacion", "casco historico", "mar", "playa")
+    ):
         return "location"
     if any(
         keyword in normalized_text
-        for keyword in ("check-in", "check in", "check-out", "mascotas", "pets", "cancel", "smoke", "adultos")
+        for keyword in (
+            "check-in",
+            "check in",
+            "check-out",
+            "mascotas",
+            "pets",
+            "cancel",
+            "smoke",
+            "adultos",
+        )
     ):
         return "policy"
-    if any(keyword in normalized_text for keyword in ("precio", "price", "tarifa", "booking", "reservar")):
+    if any(
+        keyword in normalized_text
+        for keyword in ("precio", "price", "tarifa", "booking", "reservar")
+    ):
         return "pricing"
-    if any(keyword in normalized_text for keyword in ("celebracion", "birthday", "aniversario", "servicio")):
+    if any(
+        keyword in normalized_text
+        for keyword in ("celebracion", "birthday", "aniversario", "servicio")
+    ):
         return "service"
     if extract_room_type_id(normalized_text):
         return "room_type"
