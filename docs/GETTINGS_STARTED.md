@@ -56,6 +56,13 @@ FASTER_WHISPER__API_URL=YOUR_FASTER_WHISPER_URL_GOES_HERE
 ORPHEUS__API_URL=YOUR_ORPHEUS_URL_GOES_HERE
 ```
 
+If you want callers to choose English or Spanish at the start of the call, also set:
+
+```env
+CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
+ORPHEUS_SPANISH__API_URL=YOUR_SPANISH_ORPHEUS_URL_GOES_HERE
+```
+
 ### Supported provider values
 
 ```env
@@ -128,6 +135,26 @@ ORPHEUS__MAX_TOKENS=1200
 ORPHEUS__REPETITION_PENALTY=1.1
 ORPHEUS__SAMPLE_RATE=24000
 ORPHEUS__DEBUG=false
+
+ORPHEUS_SPANISH__API_URL=YOUR_SPANISH_ORPHEUS_URL
+ORPHEUS_SPANISH__MODEL=3b-es_it-ft-research_release.q8_0.gguf
+ORPHEUS_SPANISH__VOICE=Maria
+ORPHEUS_SPANISH__TEMPERATURE=0.6
+ORPHEUS_SPANISH__TOP_P=0.9
+ORPHEUS_SPANISH__MAX_TOKENS=1200
+ORPHEUS_SPANISH__REPETITION_PENALTY=1.1
+ORPHEUS_SPANISH__SAMPLE_RATE=24000
+ORPHEUS_SPANISH__DEBUG=false
+```
+
+### Language-selection call flow
+
+To route English and Spanish callers to different TTS paths, enable the call flow:
+
+```env
+CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
+CALL_FLOW__SELECTION_RETRY_LIMIT=2
+CALL_FLOW__RINGBACK_SECONDS=2.0
 ```
 
 ### Local-only audio
@@ -155,6 +182,12 @@ Create an Orpheus pod:
 make create-orpheus-pod
 ```
 
+Create the Spanish Orpheus pod:
+
+```bash
+make create-orpheus-pod-spanish
+```
+
 Each command prints the exact env value you should copy into `.env`.
 
 The repo also includes:
@@ -162,7 +195,7 @@ The repo also includes:
 - `Dockerfile.faster_whisper`
 - `Dockerfile.orpheus`
 
-Use them if you want to build your own images instead of using the prebuilt course images referenced by the RunPod scripts.
+`Dockerfile.orpheus` is now variant-aware through the `LLAMA_ARG_HF_REPO` and `LLAMA_ARG_HF_FILE` env vars, so the same image can serve the default English model or the Spanish fine-tuned model.
 
 ## 7. Start the local Gradio UI
 

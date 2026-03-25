@@ -31,6 +31,9 @@ create-faster-whisper-pod:
 create-orpheus-pod:
 	uv run python scripts/runpod/create_orpheus_pod.py
 
+create-orpheus-pod-spanish:
+	uv run python scripts/runpod/create_orpheus_pod.py --variant spanish
+
 # --- Run Gradio ---
 
 start-gradio-application:

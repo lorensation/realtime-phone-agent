@@ -43,6 +43,22 @@
   </tr>
 </table>
 
+## Audio Routing
+
+The voice stack supports these providers:
+
+- STT: `moonshine`, `whisper-groq`, `faster-whisper`
+- TTS: `kokoro`, `together`, `orpheus-runpod`
+
+The bilingual call flow can now prompt callers to choose English or Spanish at the start of the call. English callers keep the current TTS path, while Spanish callers can be routed to a dedicated Spanish Orpheus endpoint by enabling:
+
+```env
+CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
+ORPHEUS_SPANISH__API_URL=YOUR_SPANISH_ORPHEUS_URL
+```
+
+For the full env setup and RunPod helper commands, see [docs/GETTINGS_STARTED.md](docs/GETTINGS_STARTED.md).
+
 ## License
 
 This project is licensed under the Apache License - see the [LICENSE](LICENSE) file for details.

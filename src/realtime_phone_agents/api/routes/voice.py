@@ -21,10 +21,30 @@ def _build_telephone_twiml(request: Request, voice_path: str) -> str:
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
         "<Response>"
-        "<Say>Connecting to the AI assistant.</Say>"
         f'<Connect><Stream url="{stream_url}" /></Connect>'
-        "<Say>The call has been disconnected.</Say>"
         "</Response>"
+    )
+
+
+def _replace_telephone_incoming_route(app: FastAPI, voice_path: str) -> None:
+    route_path = f"{voice_path}/telephone/incoming"
+    app.router.routes[:] = [
+        route
+        for route in app.router.routes
+        if getattr(route, "path", None) != route_path
+    ]
+
+    async def handle_incoming_call(request: Request):
+        return Response(
+            content=_build_telephone_twiml(request, voice_path),
+            media_type="application/xml",
+        )
+
+    app.add_api_route(
+        route_path,
+        handle_incoming_call,
+        methods=["GET", "POST"],
+        include_in_schema=False,
     )
 
 
@@ -42,15 +62,7 @@ def mount_voice_stream(app: FastAPI):
 
         # Mount Websocket endpoint for Twilio Integration
         agent.stream.mount(app, path="/voice")
-
-        # Twilio webhooks are often configured with GET. FastRTC mounts a POST-only
-        # handler, so we add a compatible GET route that returns the same TwiML.
-        @app.get("/voice/telephone/incoming", include_in_schema=False)
-        async def handle_incoming_call_get(request: Request):
-            return Response(
-                content=_build_telephone_twiml(request, "/voice"),
-                media_type="application/xml",
-            )
+        _replace_telephone_incoming_route(app, "/voice")
 
         app.state.voice_stream_available = True
         app.state.voice_stream_error = None

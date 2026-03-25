@@ -71,6 +71,10 @@ class RunPodSettings(BaseModel):
     orpheus_gpu_type: str = Field(
         default="NVIDIA GeForce RTX 5090", description="Orpheus GPU type"
     )
+    orpheus_image_name: str = Field(
+        default="theneuralmaze/orpheus-llamacpp-server:latest",
+        description="Container image for Orpheus llama.cpp pods",
+    )
 
 
 # --- Faster Whisper STT Configuration ---
@@ -95,6 +99,22 @@ class OrpheusTTSSettings(BaseModel):
     debug: bool = Field(default=False, description="Enable Orpheus debug mode")
 
 
+# --- Spanish Orpheus TTS Configuration ---
+class OrpheusSpanishTTSSettings(BaseModel):
+    api_url: str = Field(default="", description="Spanish Orpheus TTS API URL")
+    model: str = Field(
+        default="3b-es_it-ft-research_release.q8_0.gguf",
+        description="Spanish Orpheus TTS model",
+    )
+    voice: str = Field(default="Maria", description="Default Spanish Orpheus voice")
+    temperature: float = Field(default=0.6, description="Temperature for generation")
+    top_p: float = Field(default=0.9, description="Top-p sampling parameter")
+    max_tokens: int = Field(default=1200, description="Maximum tokens to generate")
+    repetition_penalty: float = Field(default=1.1, description="Repetition penalty")
+    sample_rate: int = Field(default=24000, description="Audio sample rate")
+    debug: bool = Field(default=False, description="Enable Orpheus debug mode")
+
+
 # --- Together AI TTS Configuration ---
 class TogetherTTSSettings(BaseModel):
     api_key: str = Field(default="", description="Together AI API key")
@@ -109,6 +129,22 @@ class TogetherTTSSettings(BaseModel):
     sample_rate: int = Field(default=24000, description="Audio sample rate")
 
 
+# --- Call Flow Configuration ---
+class CallFlowSettings(BaseModel):
+    language_selection_enabled: bool = Field(
+        default=False,
+        description="Play a bilingual language-selection prompt at call start",
+    )
+    selection_retry_limit: int = Field(
+        default=2,
+        description="Number of retry prompts before defaulting to Spanish",
+    )
+    ringback_seconds: float = Field(
+        default=2.0,
+        description="Duration of the pre-agent ringback tone",
+    )
+
+
 # --- Settings Configuration ---
 class Settings(BaseSettings):
     groq: GroqSettings = Field(default_factory=GroqSettings)
@@ -119,7 +155,11 @@ class Settings(BaseSettings):
     runpod: RunPodSettings = Field(default_factory=RunPodSettings)
     faster_whisper: FasterWhisperSettings = Field(default_factory=FasterWhisperSettings)
     orpheus: OrpheusTTSSettings = Field(default_factory=OrpheusTTSSettings)
+    orpheus_spanish: OrpheusSpanishTTSSettings = Field(
+        default_factory=OrpheusSpanishTTSSettings
+    )
     together: TogetherTTSSettings = Field(default_factory=TogetherTTSSettings)
+    call_flow: CallFlowSettings = Field(default_factory=CallFlowSettings)
     stt_model: str = Field(
         default="faster-whisper",
         description="STT provider to use (moonshine, whisper-groq, faster-whisper)",

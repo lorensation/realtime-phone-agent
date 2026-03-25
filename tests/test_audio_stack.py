@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 import base64
 import json
@@ -8,9 +9,15 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+import realtime_phone_agents.agent.fastrtc_agent as agent_module
 from realtime_phone_agents.agent.fastrtc_agent import (
     DEFAULT_SYSTEM_PROMPT,
     FastRTCAgent,
+    classify_language_selection,
+)
+from realtime_phone_agents.api.routes.voice import (
+    _build_telephone_twiml,
+    _replace_telephone_incoming_route,
 )
 from realtime_phone_agents.agent.tools.property_search import search_hotel_kb_tool
 from realtime_phone_agents.config import Settings
@@ -24,6 +31,8 @@ from realtime_phone_agents.tts.runpod.orpheus.options import OrpheusTTSOptions
 from realtime_phone_agents.tts.togetherai.model import TogetherTTSModel
 from realtime_phone_agents.tts.togetherai.options import TogetherTTSOptions
 from realtime_phone_agents.tts.utils import get_tts_model
+from fastapi import FastAPI
+from fastapi import Request as FastAPIRequest
 
 
 def load_gradio_launcher_module():
@@ -37,6 +46,26 @@ def load_gradio_launcher_module():
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def load_orpheus_pod_module():
+    script_path = (
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "runpod"
+        / "create_orpheus_pod.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "create_orpheus_pod_under_test", script_path
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+async def collect_audio(async_iterator):
+    return [item async for item in async_iterator]
 
 
 class SettingsParsingTests(unittest.TestCase):
@@ -60,6 +89,16 @@ class SettingsParsingTests(unittest.TestCase):
             runpod={
                 "api_key": "runpod-key",
                 "orpheus_gpu_type": "GPU-A",
+                "orpheus_image_name": "orpheus-image",
+            },
+            call_flow={
+                "language_selection_enabled": True,
+                "selection_retry_limit": 3,
+                "ringback_seconds": 1.5,
+            },
+            orpheus_spanish={
+                "api_url": "https://orpheus-spanish.example",
+                "voice": "Maria",
             },
         )
 
@@ -69,8 +108,15 @@ class SettingsParsingTests(unittest.TestCase):
             settings.faster_whisper.api_url, "https://faster-whisper.example"
         )
         self.assertEqual(settings.orpheus.api_url, "https://orpheus.example")
+        self.assertEqual(
+            settings.orpheus_spanish.api_url, "https://orpheus-spanish.example"
+        )
+        self.assertEqual(settings.orpheus_spanish.voice, "Maria")
         self.assertEqual(settings.together.api_key, "together-key")
         self.assertEqual(settings.runpod.orpheus_gpu_type, "GPU-A")
+        self.assertEqual(settings.runpod.orpheus_image_name, "orpheus-image")
+        self.assertTrue(settings.call_flow.language_selection_enabled)
+        self.assertEqual(settings.call_flow.selection_retry_limit, 3)
 
 
 class STTFactoryTests(unittest.TestCase):
@@ -337,6 +383,305 @@ class OrpheusTTSModelTests(unittest.TestCase):
             OrpheusTTSModel(OrpheusTTSOptions(api_url="", model="orpheus"))
 
 
+class FakeTTSModel:
+    def __init__(self, marker: int):
+        self.marker = marker
+        self.texts: list[str] = []
+
+    async def stream_tts(self, text: str, **kwargs):
+        self.texts.append(text)
+        yield 16000, np.array([self.marker], dtype=np.int16)
+
+    def tts(self, text: str, **kwargs):
+        self.texts.append(text)
+        return 16000, np.array([self.marker], dtype=np.int16)
+
+
+class FakeEffect:
+    def __init__(self, marker: int):
+        self.marker = marker
+
+    async def stream(self):
+        yield 16000, np.array([self.marker], dtype=np.float32)
+
+
+class LanguageSelectionTests(unittest.TestCase):
+    def test_classifies_accented_and_unaccented_choices(self):
+        self.assertEqual(classify_language_selection("Ingles"), "english")
+        self.assertEqual(classify_language_selection("ingles, por favor"), "english")
+        self.assertEqual(classify_language_selection("Espanol"), "spanish")
+        self.assertEqual(classify_language_selection("espanol"), "spanish")
+        self.assertEqual(classify_language_selection("castellano"), "spanish")
+        self.assertIsNone(classify_language_selection("quiero informacion"))
+
+    def _build_fake_settings(self, enabled: bool) -> SimpleNamespace:
+        return SimpleNamespace(
+            call_flow=SimpleNamespace(
+                language_selection_enabled=enabled,
+                selection_retry_limit=2,
+                ringback_seconds=1.0,
+            ),
+            orpheus_spanish=SimpleNamespace(
+                api_url="https://spanish.example",
+                model="spanish-model",
+                voice="Maria",
+                temperature=0.6,
+                top_p=0.9,
+                max_tokens=1200,
+                repetition_penalty=1.1,
+                sample_rate=24000,
+                debug=False,
+            ),
+            groq=SimpleNamespace(model="groq-model", api_key="groq-key"),
+            stt_model="whisper-groq",
+            tts_model="together",
+        )
+
+    def test_startup_flow_plays_ringback_then_bilingual_prompt(self):
+        fake_settings = self._build_fake_settings(enabled=True)
+        english_tts = FakeTTSModel(2)
+        spanish_tts = FakeTTSModel(3)
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-1"),
+            ),
+            patch.object(
+                FastRTCAgent,
+                "_create_react_agent",
+                side_effect=["default-agent", "english-agent", "spanish-agent"],
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=english_tts,
+                voice_effect=FakeEffect(9),
+                ringback_effect=FakeEffect(1),
+                spanish_tts_model=spanish_tts,
+                tools=[search_hotel_kb_tool],
+            )
+
+            chunks = asyncio.run(collect_audio(agent._startup_prompt()))
+
+        self.assertEqual([int(chunk[1][0]) for chunk in chunks], [1, 2, 3])
+        self.assertEqual(
+            english_tts.texts,
+            [
+                "Thank you for calling Blue Sardine Altea. "
+                "If you would like to speak in English, please say English."
+            ],
+        )
+        self.assertEqual(
+            spanish_tts.texts,
+            [
+                "Gracias por llamar a Blue Sardine Altea. "
+                "Si desea continuar en espanol, diga espanol."
+            ],
+        )
+
+    def test_english_selection_uses_current_tts_and_locked_agent(self):
+        fake_settings = self._build_fake_settings(enabled=True)
+        english_tts = FakeTTSModel(2)
+        spanish_tts = FakeTTSModel(3)
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-2"),
+            ),
+            patch.object(
+                FastRTCAgent,
+                "_create_react_agent",
+                side_effect=["default-agent", "english-agent", "spanish-agent"],
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=english_tts,
+                voice_effect=FakeEffect(9),
+                ringback_effect=FakeEffect(1),
+                spanish_tts_model=spanish_tts,
+                tools=[search_hotel_kb_tool],
+            )
+            session = agent._get_session()
+            chunks = asyncio.run(
+                collect_audio(agent._handle_language_selection(session, "ingles"))
+            )
+
+        self.assertEqual(session.language, "english")
+        self.assertTrue(session.language_selection_complete)
+        self.assertIs(session.tts_model, english_tts)
+        self.assertEqual(session.react_agent, "english-agent")
+        self.assertEqual([int(chunk[1][0]) for chunk in chunks], [2])
+
+    def test_spanish_selection_uses_spanish_tts_and_locked_agent(self):
+        fake_settings = self._build_fake_settings(enabled=True)
+        english_tts = FakeTTSModel(2)
+        spanish_tts = FakeTTSModel(3)
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-3"),
+            ),
+            patch.object(
+                FastRTCAgent,
+                "_create_react_agent",
+                side_effect=["default-agent", "english-agent", "spanish-agent"],
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=english_tts,
+                voice_effect=FakeEffect(9),
+                ringback_effect=FakeEffect(1),
+                spanish_tts_model=spanish_tts,
+                tools=[search_hotel_kb_tool],
+            )
+            session = agent._get_session()
+            chunks = asyncio.run(
+                collect_audio(agent._handle_language_selection(session, "espanol"))
+            )
+
+        self.assertEqual(session.language, "spanish")
+        self.assertTrue(session.language_selection_complete)
+        self.assertIs(session.tts_model, spanish_tts)
+        self.assertEqual(session.react_agent, "spanish-agent")
+        self.assertEqual([int(chunk[1][0]) for chunk in chunks], [3])
+
+    def test_retry_twice_then_defaults_to_spanish(self):
+        fake_settings = self._build_fake_settings(enabled=True)
+        english_tts = FakeTTSModel(2)
+        spanish_tts = FakeTTSModel(3)
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-4"),
+            ),
+            patch.object(
+                FastRTCAgent,
+                "_create_react_agent",
+                side_effect=["default-agent", "english-agent", "spanish-agent"],
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=english_tts,
+                voice_effect=FakeEffect(9),
+                ringback_effect=FakeEffect(1),
+                spanish_tts_model=spanish_tts,
+                tools=[search_hotel_kb_tool],
+            )
+            session = agent._get_session()
+            first_retry = asyncio.run(
+                collect_audio(agent._handle_language_selection(session, "hotel"))
+            )
+            second_retry = asyncio.run(
+                collect_audio(agent._handle_language_selection(session, "ninguno"))
+            )
+            defaulted = asyncio.run(
+                collect_audio(agent._handle_language_selection(session, "otra vez"))
+            )
+
+        self.assertFalse(session.failed_selection_attempts)
+        self.assertEqual(session.language, "spanish")
+        self.assertTrue(session.language_selection_complete)
+        self.assertEqual([int(chunk[1][0]) for chunk in first_retry], [2, 3])
+        self.assertEqual([int(chunk[1][0]) for chunk in second_retry], [2, 3])
+        self.assertEqual([int(chunk[1][0]) for chunk in defaulted], [3])
+
+    def test_feature_off_keeps_default_session_routing(self):
+        fake_settings = self._build_fake_settings(enabled=False)
+        english_tts = FakeTTSModel(2)
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-5"),
+            ),
+            patch.object(
+                FastRTCAgent, "_create_react_agent", return_value="default-agent"
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=english_tts,
+                voice_effect=FakeEffect(9),
+                tools=[search_hotel_kb_tool],
+            )
+            session = agent._get_session()
+
+        self.assertTrue(session.language_selection_complete)
+        self.assertIsNone(session.language)
+        self.assertIs(session.tts_model, english_tts)
+        self.assertEqual(session.react_agent, "default-agent")
+
+    def test_missing_spanish_api_url_fails_fast_when_feature_enabled(self):
+        fake_settings = self._build_fake_settings(enabled=True)
+        fake_settings.orpheus_spanish.api_url = ""
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                FastRTCAgent,
+                "_create_react_agent",
+                side_effect=["default-agent", "english-agent", "spanish-agent"],
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            with self.assertRaises(ValueError):
+                FastRTCAgent(
+                    stt_model=object(),
+                    tts_model=FakeTTSModel(2),
+                    voice_effect=FakeEffect(9),
+                    tools=[search_hotel_kb_tool],
+                )
+
+    def test_ringback_effect_uses_configured_duration(self):
+        fake_settings = self._build_fake_settings(enabled=True)
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_ringback_effect",
+                return_value=FakeEffect(1),
+            ) as mock_get_ringback,
+            patch.object(
+                FastRTCAgent,
+                "_create_react_agent",
+                side_effect=["default-agent", "english-agent", "spanish-agent"],
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            FastRTCAgent(
+                stt_model=object(),
+                tts_model=FakeTTSModel(2),
+                voice_effect=FakeEffect(9),
+                spanish_tts_model=FakeTTSModel(3),
+                tools=[search_hotel_kb_tool],
+            )
+
+        mock_get_ringback.assert_called_once_with(max_duration_s=1.0)
+
+
 class FastRTCAgentSmokeTests(unittest.TestCase):
     def test_hotel_agent_wires_injected_models_and_tools(self):
         fake_stream = object()
@@ -363,6 +708,94 @@ class FastRTCAgentSmokeTests(unittest.TestCase):
         self.assertIs(agent.react_agent, fake_react_agent)
         self.assertIs(agent.stream, fake_stream)
         self.assertIn("Blue Sardine Assistant", DEFAULT_SYSTEM_PROMPT)
+
+
+class VoiceRouteTests(unittest.TestCase):
+    def test_build_telephone_twiml_streams_without_spoken_preamble(self):
+        request = FastAPIRequest(
+            {
+                "type": "http",
+                "method": "POST",
+                "scheme": "https",
+                "path": "/voice/telephone/incoming",
+                "headers": [
+                    (b"host", b"localhost:8000"),
+                    (b"x-forwarded-host", b"demo.example.com"),
+                    (b"x-forwarded-proto", b"https"),
+                ],
+                "query_string": b"",
+                "server": ("localhost", 8000),
+                "client": ("127.0.0.1", 12345),
+                "http_version": "1.1",
+            }
+        )
+
+        twiml = _build_telephone_twiml(request, "/voice")
+
+        self.assertIn('wss://demo.example.com/voice/telephone/handler', twiml)
+        self.assertNotIn("Connecting to the AI assistant.", twiml)
+        self.assertNotIn("The call has been disconnected.", twiml)
+
+    def test_replace_telephone_incoming_route_replaces_existing_mount_route(self):
+        app = FastAPI()
+        app.add_api_route(
+            "/voice/telephone/incoming",
+            lambda: None,
+            methods=["POST"],
+            include_in_schema=False,
+        )
+
+        _replace_telephone_incoming_route(app, "/voice")
+
+        matching_routes = [
+            route
+            for route in app.router.routes
+            if getattr(route, "path", None) == "/voice/telephone/incoming"
+        ]
+        self.assertEqual(len(matching_routes), 1)
+        self.assertEqual(matching_routes[0].methods, {"GET", "POST"})
+
+
+class RunPodLauncherTests(unittest.TestCase):
+    def test_orpheus_pod_helper_supports_english_and_spanish_variants(self):
+        module = load_orpheus_pod_module()
+        english = module.get_orpheus_variant_config("english")
+        spanish = module.get_orpheus_variant_config("spanish")
+
+        self.assertEqual(english.env_var_name, "ORPHEUS__API_URL")
+        self.assertEqual(spanish.env_var_name, "ORPHEUS_SPANISH__API_URL")
+        self.assertEqual(
+            spanish.hf_repo,
+            "GianDiego/3b-es_it-ft-research_release-Q8-0-GGUF",
+        )
+        self.assertEqual(spanish.hf_file, "3b-es_it-ft-research_release.q8_0.gguf")
+        self.assertEqual(spanish.ctx_size, "2048")
+
+    def test_orpheus_pod_request_uses_variant_specific_env(self):
+        module = load_orpheus_pod_module()
+        with patch.object(
+            module,
+            "settings",
+            SimpleNamespace(
+                runpod=SimpleNamespace(
+                    orpheus_image_name="orpheus-image",
+                    orpheus_gpu_type="GPU-A",
+                )
+            ),
+        ):
+            request = module.build_orpheus_pod_request("spanish")
+
+        self.assertEqual(request["image_name"], "orpheus-image")
+        self.assertEqual(request["gpu_type_id"], "GPU-A")
+        self.assertEqual(
+            request["env"]["LLAMA_ARG_HF_REPO"],
+            "GianDiego/3b-es_it-ft-research_release-Q8-0-GGUF",
+        )
+        self.assertEqual(
+            request["env"]["LLAMA_ARG_HF_FILE"],
+            "3b-es_it-ft-research_release.q8_0.gguf",
+        )
+        self.assertEqual(request["env"]["LLAMA_ARG_CTX_SIZE"], "2048")
 
 
 class LauncherTests(unittest.TestCase):
