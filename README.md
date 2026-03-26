@@ -50,11 +50,11 @@ The voice stack supports these providers:
 - STT: `moonshine`, `whisper-groq`, `faster-whisper`
 - TTS: `kokoro`, `together`, `orpheus-runpod`
 
-The bilingual call flow can now prompt callers to choose English or Spanish at the start of the call. English callers keep the current TTS path, while Spanish callers can be routed to a dedicated Spanish Orpheus endpoint by enabling:
+The bilingual call flow can now prompt callers to choose English or Spanish at the start of the call. English callers keep the Orpheus TTS path, while Spanish callers use ElevenLabs TTS by enabling:
 
 ```env
 CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
-ORPHEUS_SPANISH__API_URL=YOUR_SPANISH_ORPHEUS_URL
+ELEVENLABS__API_KEY=YOUR_ELEVENLABS_KEY
 ```
 
 For the full env setup and RunPod helper commands, see [docs/GETTINGS_STARTED.md](docs/GETTINGS_STARTED.md).

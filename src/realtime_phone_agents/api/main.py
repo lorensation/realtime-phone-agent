@@ -8,15 +8,42 @@ from realtime_phone_agents.infrastructure.superlinked.service import (
 )
 from realtime_phone_agents.api.routes import health, knowledge, superlinked
 from realtime_phone_agents.api.routes.voice import mount_voice_stream
+from realtime_phone_agents.observability.opik_utils import (
+    configure as configure_opik,
+    track as track_with_opik,
+)
+
+
+@track_with_opik(
+    name="app.initialize_services",
+    tags=["app", "startup"],
+    ignore_arguments=["app"],
+    capture_output=False,
+    entrypoint=True,
+)
+async def initialize_services(app: FastAPI) -> None:
+    """Initialize shared application services."""
+    app.state.knowledge_service = get_knowledge_search_service()
+
+
+@track_with_opik(
+    name="app.shutdown_services",
+    tags=["app", "shutdown"],
+    ignore_arguments=["app"],
+    capture_output=False,
+)
+async def shutdown_services(app: FastAPI) -> None:
+    """Application shutdown hook."""
+    return None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown events."""
-    app.state.knowledge_service = get_knowledge_search_service()
+    configure_opik()
+    await initialize_services(app)
     yield
-    # Shutdown: Cleanup if needed
-    # Add any cleanup logic here if necessary
+    await shutdown_services(app)
 
 
 app = FastAPI(

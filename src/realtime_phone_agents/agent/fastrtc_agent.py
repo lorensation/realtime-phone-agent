@@ -1,3 +1,5 @@
+import inspect
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, List, Literal, Optional, Tuple
@@ -14,6 +16,8 @@ from loguru import logger
 from realtime_phone_agents.agent.tools.property_search import search_hotel_kb_tool
 from realtime_phone_agents.agent.utils import model_has_tool_calls
 from realtime_phone_agents.config import settings
+from realtime_phone_agents.observability.opik_utils import build_langchain_callbacks
+from realtime_phone_agents.observability.prompt_versioning import Prompt
 from realtime_phone_agents.stt import get_stt_model
 from realtime_phone_agents.tts import get_tts_model
 from realtime_phone_agents.tts.base import TTSModel
@@ -44,6 +48,9 @@ Do not use emojis, asterisks, bullet points, or any special formatting.
 Keep answers concise, friendly, and easy to follow.
 Include exact operational details when needed, such as check-in times, prices, address, phone, or email.
 Do not invent amenities, prices, availability, or room details.
+Keep phone responses short, with one main idea per sentence.
+If an answer would be long, give a short answer first and ask whether the caller wants more detail.
+Write numbers, dates, times, prices, room counts, and phone numbers in a way that sounds natural when spoken aloud.
 
 When presenting multiple room options, separate them with simple sentences, maintaining clarity and brevity.
 """.strip()
@@ -86,6 +93,10 @@ SPANISH_SELECTION_FALLBACK = "No he podido confirmar el idioma. Continuare en es
 
 ENGLISH_SELECTION_KEYWORDS = ("english", "ingles")
 SPANISH_SELECTION_KEYWORDS = ("espanol", "spanish", "castellano")
+DEFAULT_PROMPT_NAME = "blue_sardine_assistant.default"
+ENGLISH_PROMPT_NAME = "blue_sardine_assistant.english_locked"
+SPANISH_PROMPT_NAME = "blue_sardine_assistant.spanish_locked"
+_SENTENCE_SPLIT = re.compile(r"(?<=[\.\!\?])\s+")
 
 
 def normalize_language_selection_text(text: str) -> str:
@@ -112,6 +123,59 @@ def classify_language_selection(text: str) -> Optional[SelectedLanguage]:
 
     matches.sort(key=lambda item: item[0])
     return matches[0][1]
+
+
+def chunk_text(text: str, max_chars: int = 240) -> list[str]:
+    normalized_text = (text or "").strip()
+    if not normalized_text:
+        return []
+    if len(normalized_text) <= max_chars:
+        return [normalized_text]
+
+    chunks: list[str] = []
+    current = ""
+    for sentence in _SENTENCE_SPLIT.split(normalized_text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
+        if len(sentence) > max_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+
+            oversized_chunk = ""
+            for word in sentence.split():
+                candidate = f"{oversized_chunk} {word}".strip() if oversized_chunk else word
+                if len(candidate) <= max_chars:
+                    oversized_chunk = candidate
+                    continue
+
+                if oversized_chunk:
+                    chunks.append(oversized_chunk)
+                if len(word) <= max_chars:
+                    oversized_chunk = word
+                    continue
+
+                for start in range(0, len(word), max_chars):
+                    chunks.append(word[start : start + max_chars].strip())
+                oversized_chunk = ""
+
+            if oversized_chunk:
+                chunks.append(oversized_chunk)
+            continue
+
+        candidate = f"{current} {sentence}".strip() if current else sentence
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+
+        chunks.append(current)
+        current = sentence
+
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 @dataclass
@@ -148,12 +212,19 @@ class FastRTCAgent:
         fallback_message: str = SPANISH_FALLBACK_MESSAGE,
         system_prompt: str | None = None,
         tools: List | None = None,
+        language_locked: SelectedLanguage | None = None,
+        can_interrupt: bool = True,
     ):
         self._stt_model = stt_model or get_stt_model(settings.stt_model)
         self._tts_model = tts_model or get_tts_model(settings.tts_model)
         self._voice_effect = voice_effect or get_sound_effect()
-        self._language_selection_enabled = settings.call_flow.language_selection_enabled
+        self._language_locked = language_locked
+        self._language_selection_enabled = (
+            settings.call_flow.language_selection_enabled
+            and self._language_locked is None
+        )
         self._selection_retry_limit = settings.call_flow.selection_retry_limit
+        self._can_interrupt = can_interrupt
         self._ringback_effect = ringback_effect or get_ringback_effect(
             max_duration_s=settings.call_flow.ringback_seconds
         )
@@ -162,26 +233,30 @@ class FastRTCAgent:
         self._react_agent = self._create_react_agent(
             system_prompt=system_prompt,
             tools=tools,
+            prompt_name=DEFAULT_PROMPT_NAME,
         )
         self._english_react_agent = None
         self._spanish_react_agent = None
         self._spanish_tts_model = None
-        if self._language_selection_enabled:
+        if self._language_selection_enabled or self._language_locked is not None:
             self._english_react_agent = self._create_react_agent(
                 system_prompt=self._build_locked_system_prompt(
                     "english", system_prompt
                 ),
                 tools=tools,
+                prompt_name=ENGLISH_PROMPT_NAME,
             )
             self._spanish_react_agent = self._create_react_agent(
                 system_prompt=self._build_locked_system_prompt(
                     "spanish", system_prompt
                 ),
                 tools=tools,
+                prompt_name=SPANISH_PROMPT_NAME,
             )
-            self._spanish_tts_model = (
-                spanish_tts_model or self._build_spanish_tts_model()
-            )
+            if spanish_tts_model is not None:
+                self._spanish_tts_model = spanish_tts_model
+            elif self._language_selection_enabled or self._language_locked == "spanish":
+                self._spanish_tts_model = self._build_spanish_tts_model()
 
         self._thread_id = thread_id
         self._fallback_message = fallback_message
@@ -222,16 +297,22 @@ class FastRTCAgent:
         self,
         system_prompt: str | None = None,
         tools: List | None = None,
+        prompt_name: str = DEFAULT_PROMPT_NAME,
     ):
         llm = ChatGroq(
             model=settings.groq.model,
             api_key=settings.groq.api_key,
         )
+        prompt = Prompt(
+            name=prompt_name,
+            prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
+            tags=["voice-agent", "hotel"],
+        )
 
         agent = create_agent(
             llm,
             checkpointer=InMemorySaver(),
-            system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
+            system_prompt=prompt.text,
             tools=tools or [search_hotel_kb_tool],
         )
         return agent
@@ -243,7 +324,11 @@ class FastRTCAgent:
 
         startup_fn = self._startup_prompt if self._language_selection_enabled else None
         return Stream(
-            handler=ReplyOnPause(handler_wrapper, startup_fn=startup_fn),
+            handler=ReplyOnPause(
+                handler_wrapper,
+                startup_fn=startup_fn,
+                can_interrupt=self._can_interrupt,
+            ),
             modality="audio",
             mode="send-receive",
         )
@@ -265,6 +350,10 @@ class FastRTCAgent:
         return session
 
     def _configure_default_session(self, session: CallSessionState) -> None:
+        if self._language_locked is not None:
+            self._configure_session_language(session, self._language_locked)
+            return
+
         session.language = None
         session.language_selection_complete = True
         session.react_agent = self._react_agent
@@ -314,6 +403,10 @@ class FastRTCAgent:
                 session, transcription
             ):
                 yield audio_chunk
+            return
+
+        if not (transcription or "").strip():
+            logger.debug("Skipping empty transcription for call {}", session.call_id)
             return
 
         async for audio_chunk in self._process_with_agent(session, transcription):
@@ -382,10 +475,28 @@ class FastRTCAgent:
         final_text: str | None = None
         session.last_final_text = None
         react_agent = session.react_agent or self._react_agent
+        metadata = {
+            "call_id": session.call_id,
+            "thread_id": session.thread_id,
+            "language": session.language or "auto",
+        }
+        tags = ["voice-agent", f"language:{session.language or 'auto'}"]
+        callbacks = build_langchain_callbacks(
+            thread_id=session.thread_id,
+            tags=tags,
+            metadata=metadata,
+        )
+        config: dict[str, Any] = {
+            "configurable": {"thread_id": session.thread_id},
+            "metadata": metadata,
+            "tags": tags,
+        }
+        if callbacks:
+            config["callbacks"] = callbacks
 
         async for chunk in react_agent.astream(
             {"messages": [{"role": "user", "content": transcription}]},
-            {"configurable": {"thread_id": session.thread_id}},
+            config,
             stream_mode="updates",
         ):
             for step, data in chunk.items():
@@ -418,8 +529,26 @@ class FastRTCAgent:
         model: TTSModel,
         text: str,
     ) -> AsyncIterator[AudioChunk]:
-        async for audio_chunk in model.stream_tts(text):
-            yield audio_chunk
+        segments = chunk_text(text)
+        if not segments:
+            return
+
+        supports_context = any(
+            parameter.kind == inspect.Parameter.VAR_KEYWORD
+            or parameter.name in {"previous_text", "next_text"}
+            for parameter in inspect.signature(model.stream_tts).parameters.values()
+        )
+
+        for index, segment in enumerate(segments):
+            kwargs: dict[str, str] = {}
+            if supports_context:
+                if index > 0:
+                    kwargs["previous_text"] = segments[index - 1]
+                if index + 1 < len(segments):
+                    kwargs["next_text"] = segments[index + 1]
+
+            async for audio_chunk in model.stream_tts(segment, **kwargs):
+                yield audio_chunk
 
     async def _synthesize_speech(
         self,

@@ -1,6 +1,7 @@
 from loguru import logger
 
 from realtime_phone_agents.tts.base import TTSModel
+from realtime_phone_agents.tts.elevenlabs import ElevenLabsTTSModel
 from realtime_phone_agents.tts.local.kokoro import KokoroTTSModel
 from realtime_phone_agents.tts.runpod import OrpheusTTSModel
 from realtime_phone_agents.tts.togetherai import TogetherTTSModel
@@ -15,9 +16,11 @@ def get_tts_model(model_name: str) -> TTSModel:
         logger.info("Warming up Orpheus TTS model")
         model.tts_blocking("Warm up the speech model")
         return model
+    if model_name in {"elevenlabs-es", "elevenlabs-flash-es"}:
+        return ElevenLabsTTSModel()
     if model_name == "together":
         return TogetherTTSModel()
     raise ValueError(
         "Invalid TTS model name: "
-        f"{model_name}. Available: kokoro, together, orpheus-runpod"
+        f"{model_name}. Available: kokoro, together, orpheus-runpod, elevenlabs-es"
     )

@@ -129,6 +129,28 @@ class TogetherTTSSettings(BaseModel):
     sample_rate: int = Field(default=24000, description="Audio sample rate")
 
 
+# --- ElevenLabs TTS Configuration ---
+class ElevenLabsSettings(BaseModel):
+    api_key: str = Field(default="", description="ElevenLabs API key")
+    model_id: str = Field(
+        default="eleven_flash_v2_5", description="ElevenLabs TTS model id"
+    )
+    voice_id_es: str = Field(
+        default="gJlzF5JxsCvM5hQAoRyD",
+        description="Spanish ElevenLabs voice id",
+    )
+    output_format: str = Field(
+        default="pcm_16000",
+        description="ElevenLabs output format for TTS streaming",
+    )
+
+
+# --- Opik Configuration ---
+class OpikSettings(BaseModel):
+    api_key: str = Field(default="", description="Opik API key")
+    project_name: str = Field(default="", description="Opik project name")
+
+
 # --- Call Flow Configuration ---
 class CallFlowSettings(BaseModel):
     language_selection_enabled: bool = Field(
@@ -159,6 +181,8 @@ class Settings(BaseSettings):
         default_factory=OrpheusSpanishTTSSettings
     )
     together: TogetherTTSSettings = Field(default_factory=TogetherTTSSettings)
+    elevenlabs: ElevenLabsSettings = Field(default_factory=ElevenLabsSettings)
+    opik: OpikSettings = Field(default_factory=OpikSettings)
     call_flow: CallFlowSettings = Field(default_factory=CallFlowSettings)
     stt_model: str = Field(
         default="faster-whisper",

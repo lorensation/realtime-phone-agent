@@ -32,7 +32,7 @@ create-orpheus-pod:
 	uv run python scripts/runpod/create_orpheus_pod.py
 
 create-orpheus-pod-spanish:
-	uv run python scripts/runpod/create_orpheus_pod.py --variant spanish
+	@echo "Spanish TTS now uses ElevenLabs. No Spanish Orpheus RunPod pod is required."
 
 # --- Run Gradio ---
 

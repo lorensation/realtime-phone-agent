@@ -26,6 +26,7 @@ dependencies = [
     "transformers>=4.57.2",
     "twilio>=9.8.6",
     "typer>=0.20.0",
+    "opik>=1.10.51",
 ]
 
 [dependency-groups]

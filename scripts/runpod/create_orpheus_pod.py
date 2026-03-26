@@ -1,4 +1,3 @@
-import argparse
 from dataclasses import dataclass
 
 import runpod
@@ -7,8 +6,7 @@ from realtime_phone_agents.config import settings
 
 
 @dataclass(frozen=True)
-class OrpheusVariantConfig:
-    variant: str
+class OrpheusDeploymentConfig:
     hf_repo: str
     hf_file: str
     env_var_name: str
@@ -16,49 +14,22 @@ class OrpheusVariantConfig:
     ctx_size: str = "0"
 
 
-ORPHEUS_VARIANTS = {
-    "english": OrpheusVariantConfig(
-        variant="english",
-        hf_repo="PkmX/orpheus-3b-0.1-ft-Q8_0-GGUF",
-        hf_file="orpheus-3b-0.1-ft-q8_0.gguf",
-        env_var_name="ORPHEUS__API_URL",
-        voice="tara",
-    ),
-    "spanish": OrpheusVariantConfig(
-        variant="spanish",
-        hf_repo="GianDiego/3b-es_it-ft-research_release-Q8-0-GGUF",
-        hf_file="3b-es_it-ft-research_release.q8_0.gguf",
-        env_var_name="ORPHEUS_SPANISH__API_URL",
-        voice="Maria",
-        ctx_size="2048",
-    ),
-}
+ORPHEUS_ENGLISH_CONFIG = OrpheusDeploymentConfig(
+    hf_repo="PkmX/orpheus-3b-0.1-ft-Q8_0-GGUF",
+    hf_file="orpheus-3b-0.1-ft-q8_0.gguf",
+    env_var_name="ORPHEUS__API_URL",
+    voice="tara",
+)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Create an Orpheus llama.cpp pod on RunPod."
-    )
-    parser.add_argument(
-        "--variant",
-        choices=sorted(ORPHEUS_VARIANTS),
-        default="english",
-        help="Choose which Orpheus variant to deploy.",
-    )
-    return parser
+def get_orpheus_deployment_config() -> OrpheusDeploymentConfig:
+    return ORPHEUS_ENGLISH_CONFIG
 
 
-def get_orpheus_variant_config(variant: str) -> OrpheusVariantConfig:
-    try:
-        return ORPHEUS_VARIANTS[variant]
-    except KeyError as exc:
-        raise ValueError(f"Unknown Orpheus variant: {variant}") from exc
-
-
-def build_orpheus_pod_request(variant: str) -> dict:
-    config = get_orpheus_variant_config(variant)
+def build_orpheus_pod_request() -> dict:
+    config = get_orpheus_deployment_config()
     return {
-        "name": f"Orpheus Server ({config.variant})",
+        "name": "Orpheus Server (english)",
         "image_name": settings.runpod.orpheus_image_name,
         "gpu_type_id": settings.runpod.orpheus_gpu_type,
         "cloud_type": "SECURE",
@@ -81,13 +52,12 @@ def main() -> None:
             "RunPod API key is required. Set RUNPOD__API_KEY in your environment."
         )
 
-    args = build_parser().parse_args()
-    config = get_orpheus_variant_config(args.variant)
-    pod_request = build_orpheus_pod_request(args.variant)
+    config = get_orpheus_deployment_config()
+    pod_request = build_orpheus_pod_request()
 
     runpod.api_key = settings.runpod.api_key
 
-    print(f"Creating {config.variant} Orpheus pod...")
+    print("Creating English Orpheus pod...")
     pod = runpod.create_pod(**pod_request)
 
     pod_id = pod.get("id")
@@ -99,7 +69,8 @@ def main() -> None:
     print("=" * 60)
     print("Add the following to your .env file:")
     print(f"{config.env_var_name}={pod_url}")
-    print(f"# Suggested voice for this variant: {config.voice}")
+    print(f"# Suggested voice for Orpheus English: {config.voice}")
+    print("# Spanish TTS now uses ElevenLabs. No Spanish Orpheus pod is required.")
     print("=" * 60)
 
 

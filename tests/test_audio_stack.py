@@ -13,11 +13,14 @@ import realtime_phone_agents.agent.fastrtc_agent as agent_module
 from realtime_phone_agents.agent.fastrtc_agent import (
     DEFAULT_SYSTEM_PROMPT,
     FastRTCAgent,
+    chunk_text,
     classify_language_selection,
 )
 from realtime_phone_agents.api.routes.voice import (
-    _build_telephone_twiml,
+    _build_connect_twiml,
+    _build_language_gather_twiml,
     _replace_telephone_incoming_route,
+    _replace_telephone_language_route,
 )
 from realtime_phone_agents.agent.tools.property_search import search_hotel_kb_tool
 from realtime_phone_agents.config import Settings
@@ -25,6 +28,7 @@ from realtime_phone_agents.stt.runpod.faster_whisper.model import FasterWhisperS
 from realtime_phone_agents.stt.runpod.faster_whisper.options import (
     FasterWhisperSTTOptions,
 )
+from realtime_phone_agents.tts.elevenlabs.model import ElevenLabsTTSModel
 from realtime_phone_agents.stt.utils import get_stt_model
 from realtime_phone_agents.tts.runpod.orpheus.model import OrpheusTTSModel
 from realtime_phone_agents.tts.runpod.orpheus.options import OrpheusTTSOptions
@@ -33,6 +37,7 @@ from realtime_phone_agents.tts.togetherai.options import TogetherTTSOptions
 from realtime_phone_agents.tts.utils import get_tts_model
 from fastapi import FastAPI
 from fastapi import Request as FastAPIRequest
+from fastapi.testclient import TestClient
 
 
 def load_gradio_launcher_module():
@@ -68,6 +73,18 @@ async def collect_audio(async_iterator):
     return [item async for item in async_iterator]
 
 
+class OpikDecoratorTests(unittest.TestCase):
+    def test_track_returns_noop_decorator_when_opik_is_unavailable(self):
+        import realtime_phone_agents.observability.opik_utils as opik_utils
+
+        with patch.object(opik_utils, "opik", None):
+            @opik_utils.track(name="noop")
+            def decorated():
+                return "ok"
+
+        self.assertEqual(decorated(), "ok")
+
+
 class SettingsParsingTests(unittest.TestCase):
     def test_settings_accept_audio_provider_configuration(self):
         settings = Settings(
@@ -85,6 +102,15 @@ class SettingsParsingTests(unittest.TestCase):
             together={
                 "api_key": "together-key",
                 "voice": "tara",
+            },
+            elevenlabs={
+                "api_key": "eleven-key",
+                "voice_id_es": "voice-es",
+                "output_format": "pcm_16000",
+            },
+            opik={
+                "api_key": "opik-key",
+                "project_name": "blue-sardine-hotel",
             },
             runpod={
                 "api_key": "runpod-key",
@@ -113,6 +139,9 @@ class SettingsParsingTests(unittest.TestCase):
         )
         self.assertEqual(settings.orpheus_spanish.voice, "Maria")
         self.assertEqual(settings.together.api_key, "together-key")
+        self.assertEqual(settings.elevenlabs.api_key, "eleven-key")
+        self.assertEqual(settings.elevenlabs.output_format, "pcm_16000")
+        self.assertEqual(settings.opik.project_name, "blue-sardine-hotel")
         self.assertEqual(settings.runpod.orpheus_gpu_type, "GPU-A")
         self.assertEqual(settings.runpod.orpheus_image_name, "orpheus-image")
         self.assertTrue(settings.call_flow.language_selection_enabled)
@@ -161,6 +190,12 @@ class TTSFactoryTests(unittest.TestCase):
             return_value="together",
         ):
             self.assertEqual(get_tts_model("together"), "together")
+
+        with patch(
+            "realtime_phone_agents.tts.utils.ElevenLabsTTSModel",
+            return_value="elevenlabs",
+        ):
+            self.assertEqual(get_tts_model("elevenlabs-es"), "elevenlabs")
 
     def test_get_tts_model_rejects_invalid_name(self):
         with self.assertRaises(ValueError):
@@ -339,6 +374,79 @@ class TogetherTTSModelTests(unittest.TestCase):
         )
 
 
+class ElevenLabsTTSModelTests(unittest.TestCase):
+    def test_elevenlabs_streams_pcm_audio_from_httpx_async_client(self):
+        import realtime_phone_agents.tts.elevenlabs.model as eleven_model
+
+        class FakeResponse:
+            def __init__(self):
+                self.status_code = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            def raise_for_status(self):
+                return None
+
+            async def aiter_bytes(self):
+                for chunk in (b"\x01\x00\x02\x00", b"\x03\x00\x04\x00"):
+                    yield chunk
+
+        class FakeClient:
+            last_request = None
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            def stream(self, method, url, headers=None, params=None, json=None):
+                FakeClient.last_request = (method, url, headers, params, json)
+                return FakeResponse()
+
+        with patch.object(eleven_model.httpx, "AsyncClient", FakeClient):
+            model = ElevenLabsTTSModel(
+                api_key="eleven-key",
+                model_id="eleven_flash_v2_5",
+                voice_id="voice-es",
+                output_format="pcm_16000",
+            )
+            chunks = asyncio.run(
+                collect_audio(
+                    model.stream_tts(
+                        "hola",
+                        previous_text="bienvenido",
+                        next_text="gracias",
+                    )
+                )
+            )
+
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(chunks[0][0], 16000)
+        np.testing.assert_array_equal(
+            chunks[0][1], np.frombuffer(b"\x01\x00\x02\x00", dtype=np.int16)
+        )
+        self.assertEqual(
+            FakeClient.last_request[1],
+            "https://api.elevenlabs.io/v1/text-to-speech/voice-es/stream",
+        )
+        self.assertEqual(FakeClient.last_request[3], {"output_format": "pcm_16000"})
+        self.assertEqual(FakeClient.last_request[4]["model_id"], "eleven_flash_v2_5")
+        self.assertEqual(FakeClient.last_request[4]["language_code"], "es")
+        self.assertEqual(
+            FakeClient.last_request[4]["apply_text_normalization"], "auto"
+        )
+        self.assertEqual(FakeClient.last_request[4]["previous_text"], "bienvenido")
+        self.assertEqual(FakeClient.last_request[4]["next_text"], "gracias")
+
+
 class OrpheusTTSModelTests(unittest.TestCase):
     def test_orpheus_streams_audio_from_stubbed_endpoint(self):
         import realtime_phone_agents.tts.runpod.orpheus.model as orpheus_model
@@ -403,6 +511,94 @@ class FakeEffect:
 
     async def stream(self):
         yield 16000, np.array([self.marker], dtype=np.float32)
+
+
+class RecordingContextTTSModel:
+    def __init__(self):
+        self.calls: list[tuple[str, dict[str, str]]] = []
+
+    async def stream_tts(self, text: str, **kwargs):
+        self.calls.append((text, kwargs))
+        yield 16000, np.array([len(self.calls)], dtype=np.int16)
+
+    def tts(self, text: str, **kwargs):
+        self.calls.append((text, kwargs))
+        return 16000, np.array([len(self.calls)], dtype=np.int16)
+
+
+class ChunkingTests(unittest.TestCase):
+    def test_chunk_text_respects_max_chars_and_keeps_order(self):
+        text = (
+            "Primera frase corta. "
+            "Segunda frase tambien corta. "
+            "Tercera frase algo mas larga para obligar a crear varios trozos."
+        )
+
+        chunks = chunk_text(text, max_chars=40)
+
+        self.assertTrue(chunks)
+        self.assertTrue(all(len(chunk) <= 40 for chunk in chunks))
+        self.assertEqual(" ".join(chunks), text)
+
+    def test_synthesize_text_with_model_streams_segments_in_order(self):
+        fake_settings = SimpleNamespace(
+            call_flow=SimpleNamespace(
+                language_selection_enabled=False,
+                selection_retry_limit=2,
+                ringback_seconds=1.0,
+            ),
+            orpheus_spanish=SimpleNamespace(
+                api_url="https://spanish.example",
+                model="spanish-model",
+                voice="Maria",
+                temperature=0.6,
+                top_p=0.9,
+                max_tokens=1200,
+                repetition_penalty=1.1,
+                sample_rate=24000,
+                debug=False,
+            ),
+            groq=SimpleNamespace(model="groq-model", api_key="groq-key"),
+            stt_model="whisper-groq",
+            tts_model="together",
+        )
+        model = RecordingContextTTSModel()
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                FastRTCAgent, "_create_react_agent", return_value="default-agent"
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=model,
+                voice_effect=FakeEffect(9),
+                ringback_effect=FakeEffect(1),
+                tools=[search_hotel_kb_tool],
+            )
+            text = (
+                "Primera frase corta con informacion sobre horarios y desayuno. "
+                "Segunda frase corta con informacion sobre aparcamiento y recepcion. "
+                "Tercera frase corta con informacion sobre habitaciones y politicas. "
+                "Cuarta frase corta con informacion sobre ubicacion y contacto."
+            )
+            chunks = asyncio.run(
+                collect_audio(
+                    agent._synthesize_text_with_model(
+                        model,
+                        text,
+                    )
+                )
+            )
+
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(" ".join(call[0] for call in model.calls), text)
+        self.assertEqual(model.calls[0][1]["next_text"], model.calls[1][0])
+        self.assertEqual(
+            model.calls[1][1]["previous_text"], model.calls[0][0]
+        )
 
 
 class LanguageSelectionTests(unittest.TestCase):
@@ -699,6 +895,7 @@ class FastRTCAgentSmokeTests(unittest.TestCase):
             agent = FastRTCAgent(
                 stt_model=fake_stt,
                 tts_model=fake_tts,
+                spanish_tts_model=fake_tts,
                 voice_effect=fake_effect,
                 tools=[search_hotel_kb_tool],
             )
@@ -711,7 +908,7 @@ class FastRTCAgentSmokeTests(unittest.TestCase):
 
 
 class VoiceRouteTests(unittest.TestCase):
-    def test_build_telephone_twiml_streams_without_spoken_preamble(self):
+    def test_build_language_gather_twiml_contains_gather_and_action(self):
         request = FastAPIRequest(
             {
                 "type": "http",
@@ -730,11 +927,45 @@ class VoiceRouteTests(unittest.TestCase):
             }
         )
 
-        twiml = _build_telephone_twiml(request, "/voice")
+        twiml = _build_language_gather_twiml(request)
 
-        self.assertIn('wss://demo.example.com/voice/telephone/handler', twiml)
-        self.assertNotIn("Connecting to the AI assistant.", twiml)
-        self.assertNotIn("The call has been disconnected.", twiml)
+        self.assertIn("<Gather", twiml)
+        self.assertIn(
+            'action="https://demo.example.com/voice/telephone/language?retry=0"',
+            twiml,
+        )
+        self.assertIn('input="dtmf speech"', twiml)
+        self.assertIn('actionOnEmptyResult="true"', twiml)
+        self.assertIn("For English press two or say English.", twiml)
+
+    def test_build_connect_twiml_routes_to_language_specific_handler(self):
+        request = FastAPIRequest(
+            {
+                "type": "http",
+                "method": "POST",
+                "scheme": "https",
+                "path": "/voice/telephone/language",
+                "headers": [
+                    (b"host", b"localhost:8000"),
+                    (b"x-forwarded-host", b"demo.example.com"),
+                    (b"x-forwarded-proto", b"https"),
+                ],
+                "query_string": b"",
+                "server": ("localhost", 8000),
+                "client": ("127.0.0.1", 12345),
+                "http_version": "1.1",
+            }
+        )
+
+        twiml = _build_connect_twiml(
+            request,
+            voice_path="/voice-es",
+            greeting="Gracias",
+            language="es-ES",
+        )
+
+        self.assertIn('wss://demo.example.com/voice-es/telephone/handler', twiml)
+        self.assertIn("<Say", twiml)
 
     def test_replace_telephone_incoming_route_replaces_existing_mount_route(self):
         app = FastAPI()
@@ -745,7 +976,7 @@ class VoiceRouteTests(unittest.TestCase):
             include_in_schema=False,
         )
 
-        _replace_telephone_incoming_route(app, "/voice")
+        _replace_telephone_incoming_route(app)
 
         matching_routes = [
             route
@@ -755,23 +986,63 @@ class VoiceRouteTests(unittest.TestCase):
         self.assertEqual(len(matching_routes), 1)
         self.assertEqual(matching_routes[0].methods, {"GET", "POST"})
 
+    def test_language_route_connects_to_spanish_and_english_handlers(self):
+        app = FastAPI()
+        _replace_telephone_language_route(app)
+        client = TestClient(app, base_url="https://demo.example.com")
+
+        spanish = client.post(
+            "/voice/telephone/language?retry=0",
+            data={"Digits": "1"},
+            headers={"x-forwarded-host": "demo.example.com", "x-forwarded-proto": "https"},
+        )
+        english = client.post(
+            "/voice/telephone/language?retry=0",
+            data={"Digits": "2"},
+            headers={"x-forwarded-host": "demo.example.com", "x-forwarded-proto": "https"},
+        )
+
+        self.assertEqual(spanish.status_code, 200)
+        self.assertIn(
+            'wss://demo.example.com/voice-es/telephone/handler',
+            spanish.text,
+        )
+        self.assertIn(
+            'wss://demo.example.com/voice-en/telephone/handler',
+            english.text,
+        )
+
+    def test_language_route_defaults_to_spanish_after_retry_limit(self):
+        app = FastAPI()
+        _replace_telephone_language_route(app)
+        client = TestClient(app, base_url="https://demo.example.com")
+
+        response = client.post(
+            "/voice/telephone/language?retry=2",
+            data={"SpeechResult": "no entiendo"},
+            headers={"x-forwarded-host": "demo.example.com", "x-forwarded-proto": "https"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            'wss://demo.example.com/voice-es/telephone/handler',
+            response.text,
+        )
+        self.assertIn("Continuare en espanol", response.text)
+
 
 class RunPodLauncherTests(unittest.TestCase):
-    def test_orpheus_pod_helper_supports_english_and_spanish_variants(self):
+    def test_orpheus_pod_helper_uses_english_only_configuration(self):
         module = load_orpheus_pod_module()
-        english = module.get_orpheus_variant_config("english")
-        spanish = module.get_orpheus_variant_config("spanish")
+        config = module.get_orpheus_deployment_config()
 
-        self.assertEqual(english.env_var_name, "ORPHEUS__API_URL")
-        self.assertEqual(spanish.env_var_name, "ORPHEUS_SPANISH__API_URL")
-        self.assertEqual(
-            spanish.hf_repo,
-            "GianDiego/3b-es_it-ft-research_release-Q8-0-GGUF",
-        )
-        self.assertEqual(spanish.hf_file, "3b-es_it-ft-research_release.q8_0.gguf")
-        self.assertEqual(spanish.ctx_size, "2048")
+        self.assertEqual(config.env_var_name, "ORPHEUS__API_URL")
+        self.assertEqual(config.hf_repo, "PkmX/orpheus-3b-0.1-ft-Q8_0-GGUF")
+        self.assertEqual(config.hf_file, "orpheus-3b-0.1-ft-q8_0.gguf")
+        self.assertEqual(config.voice, "tara")
+        self.assertEqual(config.ctx_size, "0")
 
-    def test_orpheus_pod_request_uses_variant_specific_env(self):
+    def test_orpheus_pod_request_uses_english_model_env(self):
         module = load_orpheus_pod_module()
         with patch.object(
             module,
@@ -783,19 +1054,19 @@ class RunPodLauncherTests(unittest.TestCase):
                 )
             ),
         ):
-            request = module.build_orpheus_pod_request("spanish")
+            request = module.build_orpheus_pod_request()
 
         self.assertEqual(request["image_name"], "orpheus-image")
         self.assertEqual(request["gpu_type_id"], "GPU-A")
         self.assertEqual(
             request["env"]["LLAMA_ARG_HF_REPO"],
-            "GianDiego/3b-es_it-ft-research_release-Q8-0-GGUF",
+            "PkmX/orpheus-3b-0.1-ft-Q8_0-GGUF",
         )
         self.assertEqual(
             request["env"]["LLAMA_ARG_HF_FILE"],
-            "3b-es_it-ft-research_release.q8_0.gguf",
+            "orpheus-3b-0.1-ft-q8_0.gguf",
         )
-        self.assertEqual(request["env"]["LLAMA_ARG_CTX_SIZE"], "2048")
+        self.assertEqual(request["env"]["LLAMA_ARG_CTX_SIZE"], "0")
 
 
 class LauncherTests(unittest.TestCase):

@@ -60,7 +60,8 @@ If you want callers to choose English or Spanish at the start of the call, also 
 
 ```env
 CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
-ORPHEUS_SPANISH__API_URL=YOUR_SPANISH_ORPHEUS_URL_GOES_HERE
+ELEVENLABS__API_KEY=YOUR_ELEVENLABS_KEY_GOES_HERE
+ELEVENLABS__VOICE_ID_ES=gJlzF5JxsCvM5hQAoRyD
 ```
 
 ### Supported provider values
@@ -120,7 +121,7 @@ RUNPOD__FASTER_WHISPER_GPU_TYPE=NVIDIA GeForce RTX 4090
 RUNPOD__ORPHEUS_GPU_TYPE=NVIDIA GeForce RTX 5090
 ```
 
-The deployed endpoints are configured here:
+The deployed RunPod endpoints are configured here:
 
 ```env
 FASTER_WHISPER__API_URL=YOUR_FASTER_WHISPER_URL
@@ -135,17 +136,9 @@ ORPHEUS__MAX_TOKENS=1200
 ORPHEUS__REPETITION_PENALTY=1.1
 ORPHEUS__SAMPLE_RATE=24000
 ORPHEUS__DEBUG=false
-
-ORPHEUS_SPANISH__API_URL=YOUR_SPANISH_ORPHEUS_URL
-ORPHEUS_SPANISH__MODEL=3b-es_it-ft-research_release.q8_0.gguf
-ORPHEUS_SPANISH__VOICE=Maria
-ORPHEUS_SPANISH__TEMPERATURE=0.6
-ORPHEUS_SPANISH__TOP_P=0.9
-ORPHEUS_SPANISH__MAX_TOKENS=1200
-ORPHEUS_SPANISH__REPETITION_PENALTY=1.1
-ORPHEUS_SPANISH__SAMPLE_RATE=24000
-ORPHEUS_SPANISH__DEBUG=false
 ```
+
+Spanish telephone TTS now uses ElevenLabs, so no Spanish Orpheus RunPod pod is required.
 
 ### Language-selection call flow
 
@@ -182,12 +175,6 @@ Create an Orpheus pod:
 make create-orpheus-pod
 ```
 
-Create the Spanish Orpheus pod:
-
-```bash
-make create-orpheus-pod-spanish
-```
-
 Each command prints the exact env value you should copy into `.env`.
 
 The repo also includes:
@@ -195,7 +182,7 @@ The repo also includes:
 - `Dockerfile.faster_whisper`
 - `Dockerfile.orpheus`
 
-`Dockerfile.orpheus` is now variant-aware through the `LLAMA_ARG_HF_REPO` and `LLAMA_ARG_HF_FILE` env vars, so the same image can serve the default English model or the Spanish fine-tuned model.
+`Dockerfile.orpheus` is configured through the `LLAMA_ARG_HF_REPO` and `LLAMA_ARG_HF_FILE` env vars so the same image can serve the current English Orpheus model.
 
 ## 7. Start the local Gradio UI
 

@@ -6,10 +6,10 @@
   "responsible": "Codex migration bundle",
   "confidence": "official_plus_internal_unvalidated_pricing",
   "files": {
-    "documents.json": "d0a438a6f8410eb2d24da693482c7ad83deca49a6f9651cb1a152bbdd0dfb92d",
-    "faq.json": "908c69524337238a858a22abe0397c57f3a653bb164264aed008868fa9222f1c",
-    "hotel.json": "2f87720f05aec8156c60ffd86bf7340230859dd35b50f140aa156ddca67e9ce6",
-    "pricing_inventory_internal.json": "7763e09177e660625368fc7c46d7cf7f01bd499c2a7787e6e05e49bac1a58520",
-    "room_types.json": "df6aecb3d40415824b5eed560cc34740da130f78a513da95e37222637c00f4da"
+    "documents.json": "54ba605a882b73d40e44ce55d161fca4981d7df65ca657adc6fcd62eeb35bf6e",
+    "faq.json": "719ffc50b60a964701a05a5a9c3042a9ab65ccfc0092887c39122d4482ba1e47",
+    "hotel.json": "86829065e10c2f66e713ccbea5676ed1ec4c5ce992851cf984ec9ddf2ce777e6",
+    "pricing_inventory_internal.json": "9016924f11d9fa3e498e7a2d621d1c0797e603911ca26e2378b07fd2d8eb90c0",
+    "room_types.json": "d523718ff2fe1880a9a94cbe559e761da31102e93816ad89e9394485d10dab63"
   }
 }
