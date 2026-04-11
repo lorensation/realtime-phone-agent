@@ -526,6 +526,22 @@ class RecordingContextTTSModel:
         return 16000, np.array([len(self.calls)], dtype=np.int16)
 
 
+class FakeMessage:
+    def __init__(self, content: str, tool_calls=None):
+        self.content = content
+        self.tool_calls = tool_calls or []
+
+
+class FakeStreamingAgent:
+    def __init__(self, final_text: str = "respuesta final"):
+        self.final_text = final_text
+        self._prompt_telemetry = {"prompt.core.source": "test"}
+
+    async def astream(self, *_args, **_kwargs):
+        yield {"model": {"messages": [FakeMessage("", tool_calls=[{"id": "tool-1"}])]}}
+        yield {"model": {"messages": [FakeMessage(self.final_text)]}}
+
+
 class ChunkingTests(unittest.TestCase):
     def test_chunk_text_respects_max_chars_and_keeps_order(self):
         text = (
@@ -904,7 +920,99 @@ class FastRTCAgentSmokeTests(unittest.TestCase):
         self.assertIs(agent.tts_model, fake_tts)
         self.assertIs(agent.react_agent, fake_react_agent)
         self.assertIs(agent.stream, fake_stream)
-        self.assertIn("Blue Sardine Assistant", DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("phone receptionist for Blue Sardine Altea", DEFAULT_SYSTEM_PROMPT)
+
+
+class LookupCuePolicyTests(unittest.TestCase):
+    def _build_fake_settings(self, preamble_mode="auto", sound_mode="auto"):
+        return SimpleNamespace(
+            call_flow=SimpleNamespace(
+                language_selection_enabled=False,
+                selection_retry_limit=2,
+                ringback_seconds=1.0,
+                tool_use_preamble_mode=preamble_mode,
+                lookup_sound_mode=sound_mode,
+                lookup_latency_threshold_ms=1200,
+            ),
+            orpheus_spanish=SimpleNamespace(
+                api_url="https://spanish.example",
+                model="spanish-model",
+                voice="Maria",
+                temperature=0.6,
+                top_p=0.9,
+                max_tokens=1200,
+                repetition_penalty=1.1,
+                sample_rate=24000,
+                debug=False,
+            ),
+            groq=SimpleNamespace(model="groq-model", api_key="groq-key"),
+            stt_model="whisper-groq",
+            tts_model="together",
+        )
+
+    def test_simple_lookup_does_not_force_preamble_or_sound_in_auto_mode(self):
+        fake_settings = self._build_fake_settings()
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-auto-1"),
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=FakeTTSModel(2),
+                voice_effect=FakeEffect(9),
+                tools=[search_hotel_kb_tool],
+            )
+            session = agent._get_session()
+            session.react_agent = FakeStreamingAgent("parking confirmado")
+            chunks = asyncio.run(
+                collect_audio(agent._process_with_agent(session, "Hay parking?"))
+            )
+
+        self.assertEqual(chunks, [])
+        self.assertEqual(session.last_final_text, "parking confirmado")
+
+    def test_complex_lookup_can_emit_preamble_in_auto_mode(self):
+        fake_settings = self._build_fake_settings(sound_mode="never")
+
+        with (
+            patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_current_context",
+                return_value=SimpleNamespace(webrtc_id="call-auto-2"),
+            ),
+            patch.object(FastRTCAgent, "_build_stream", return_value=object()),
+        ):
+            tts_model = FakeTTSModel(2)
+            agent = FastRTCAgent(
+                stt_model=object(),
+                tts_model=tts_model,
+                voice_effect=FakeEffect(9),
+                tools=[search_hotel_kb_tool],
+            )
+            session = agent._get_session()
+            session.react_agent = FakeStreamingAgent("precio orientativo")
+            chunks = asyncio.run(
+                collect_audio(
+                    agent._process_with_agent(
+                        session,
+                        (
+                            "How much is the studio with terrace if I stay next month "
+                            "for two adults and need flexible cancellation?"
+                        ),
+                    )
+                )
+            )
+
+        self.assertEqual([int(chunk[1][0]) for chunk in chunks], [2])
+        self.assertEqual(tts_model.texts, ["Un momento."])
+        self.assertEqual(session.last_final_text, "precio orientativo")
 
 
 class VoiceRouteTests(unittest.TestCase):

@@ -43,6 +43,32 @@
   </tr>
 </table>
 
+## Hotel KB + Prompts
+
+The repo now ships with a hotel-specific Blue Sardine knowledge bundle at `data/blue_sardine_kb/2026-04-11`.
+
+- Structured hotel facts stay loaded in memory for deterministic contact and policy fallbacks.
+- Semantic facts, FAQs, operational notes, and dialogue exemplars are indexed through `Superlinked + Qdrant`.
+- Prompt components are loaded remote-first from Opik and fall back to local prompt files if Opik is unavailable.
+
+You can ingest the current bundle manually with:
+
+```bash
+uv run python scripts/ingest_hotel_kb.py
+```
+
+Key prompt and retrieval env vars:
+
+```env
+KNOWLEDGE_BASE__DEFAULT_BUNDLE_PATH=data/blue_sardine_kb/2026-04-11
+KNOWLEDGE_BASE__COLLECTION_NAME=hotel-knowledge
+PROMPTS__REMOTE_ENABLED=true
+PROMPTS__CORE__NAME=blue_sardine.receptionist.core
+PROMPTS__RETRIEVAL__NAME=blue_sardine.receptionist.retrieval
+PROMPTS__ESCALATION__NAME=blue_sardine.receptionist.escalation
+PROMPTS__STYLE__NAME=blue_sardine.receptionist.style
+```
+
 ## Audio Routing
 
 The voice stack supports these providers:
@@ -55,6 +81,14 @@ The bilingual call flow can now prompt callers to choose English or Spanish at t
 ```env
 CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
 ELEVENLABS__API_KEY=YOUR_ELEVENLABS_KEY
+```
+
+Lookup cues are no longer mandatory on every retrieval turn. The default behavior is direct and natural, with optional brief pauses controlled by:
+
+```env
+CALL_FLOW__TOOL_USE_PREAMBLE_MODE=auto
+CALL_FLOW__LOOKUP_SOUND_MODE=auto
+CALL_FLOW__LOOKUP_LATENCY_THRESHOLD_MS=1200
 ```
 
 For the full env setup and RunPod helper commands, see [docs/GETTINGS_STARTED.md](docs/GETTINGS_STARTED.md).

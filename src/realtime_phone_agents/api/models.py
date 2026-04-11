@@ -24,3 +24,25 @@ class SearchRequest(BaseModel):
     language: str | None = Field(
         default=None, description="Optional language filter for debugging or tests"
     )
+    hotel_id: str | None = Field(
+        default=None, description="Optional hotel identifier filter"
+    )
+    doc_types: list[str] | None = Field(
+        default=None, description="Optional list of document types to search"
+    )
+    section: str | None = Field(
+        default=None, description="Optional section filter such as policies or rooms"
+    )
+    room_type_id: str | None = Field(
+        default=None, description="Optional explicit room type filter"
+    )
+    policy_type: str | None = Field(
+        default=None, description="Optional policy subtype filter"
+    )
+    amenity_type: str | None = Field(
+        default=None, description="Optional amenity subtype filter"
+    )
+    search_mode: str = Field(
+        default="factual",
+        description="Retrieval mode: factual, handoff, or style",
+    )

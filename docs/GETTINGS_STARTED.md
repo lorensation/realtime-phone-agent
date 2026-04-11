@@ -56,6 +56,38 @@ FASTER_WHISPER__API_URL=YOUR_FASTER_WHISPER_URL_GOES_HERE
 ORPHEUS__API_URL=YOUR_ORPHEUS_URL_GOES_HERE
 ```
 
+### Hotel knowledge and prompt setup
+
+The hotel agent defaults to the versioned Blue Sardine bundle and a dedicated hotel knowledge collection:
+
+```env
+KNOWLEDGE_BASE__DEFAULT_BUNDLE_PATH=data/blue_sardine_kb/2026-04-11
+KNOWLEDGE_BASE__COLLECTION_NAME=hotel-knowledge
+KNOWLEDGE_BASE__DEFAULT_HOTEL_ID=blue_sardine_altea
+```
+
+Prompt components are loaded from Opik by name and optional pinned commit. If a prompt cannot be fetched, the app falls back to the bundled local prompt text.
+
+```env
+OPIK__API_KEY=YOUR_OPIK_KEY
+OPIK__PROJECT_NAME=blue-sardine-hotel
+PROMPTS__REMOTE_ENABLED=true
+PROMPTS__CORE__NAME=blue_sardine.receptionist.core
+PROMPTS__CORE__COMMIT=
+PROMPTS__RETRIEVAL__NAME=blue_sardine.receptionist.retrieval
+PROMPTS__RETRIEVAL__COMMIT=
+PROMPTS__ESCALATION__NAME=blue_sardine.receptionist.escalation
+PROMPTS__ESCALATION__COMMIT=
+PROMPTS__STYLE__NAME=blue_sardine.receptionist.style
+PROMPTS__STYLE__COMMIT=
+```
+
+To ingest the bundle manually:
+
+```bash
+uv run python scripts/ingest_hotel_kb.py
+```
+
 If you want callers to choose English or Spanish at the start of the call, also set:
 
 ```env
@@ -148,6 +180,9 @@ To route English and Spanish callers to different TTS paths, enable the call flo
 CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
 CALL_FLOW__SELECTION_RETRY_LIMIT=2
 CALL_FLOW__RINGBACK_SECONDS=2.0
+CALL_FLOW__TOOL_USE_PREAMBLE_MODE=auto
+CALL_FLOW__LOOKUP_SOUND_MODE=auto
+CALL_FLOW__LOOKUP_LATENCY_THRESHOLD_MS=1200
 ```
 
 ### Local-only audio

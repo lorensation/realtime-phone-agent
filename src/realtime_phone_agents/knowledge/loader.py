@@ -7,11 +7,13 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from realtime_phone_agents.knowledge.models import (
+    DialoguesData,
     DocumentsData,
     FAQData,
     HotelData,
     HotelKnowledgeBundle,
     Manifest,
+    OperationalNotesData,
     PricingInventoryData,
     RoomTypesData,
 )
@@ -23,6 +25,8 @@ REQUIRED_BUNDLE_FILES = (
     "pricing_inventory_internal.json",
     "faq.json",
     "documents.json",
+    "dialogues.json",
+    "operational_notes.json",
 )
 
 
@@ -67,6 +71,10 @@ def load_knowledge_bundle(bundle_path: str | Path) -> HotelKnowledgeBundle:
         documents = DocumentsData.model_validate(
             _load_json(base_path / "documents.json")
         )
+        dialogues = DialoguesData.model_validate(_load_json(base_path / "dialogues.json"))
+        operational_notes = OperationalNotesData.model_validate(
+            _load_json(base_path / "operational_notes.json")
+        )
     except ValidationError as exc:
         raise ValueError(
             f"Invalid knowledge bundle data in {base_path}: {exc}"
@@ -103,5 +111,7 @@ def load_knowledge_bundle(bundle_path: str | Path) -> HotelKnowledgeBundle:
         pricing_inventory=pricing_inventory,
         faq=faq,
         documents=documents,
+        dialogues=dialogues,
+        operational_notes=operational_notes,
         bundle_path=base_path,
     )

@@ -1,8 +1,13 @@
 from superlinked import framework as sl
 
 from realtime_phone_agents.infrastructure.superlinked.constants import (
+    AMENITY_TYPES,
+    DOC_TYPES,
     ENTITY_TYPES,
+    HOTEL_IDS,
+    POLICY_TYPES,
     SOURCE_PRIORITIES,
+    SECTIONS,
     SUPPORTED_LANGUAGES,
     VERIFICATION_STATES,
 )
@@ -25,8 +30,19 @@ knowledge_search_query = (
     .find(knowledge_schema)
     .similar(title_space, sl.Param("title_query"))
     .similar(body_space, sl.Param("body_query"))
+    .filter(knowledge_schema.hotel_id == sl.Param("hotel_id", options=HOTEL_IDS))
     .filter(
         knowledge_schema.entity_type == sl.Param("entity_type", options=ENTITY_TYPES)
+    )
+    .filter(knowledge_schema.section == sl.Param("section", options=SECTIONS))
+    .filter(knowledge_schema.doc_type == sl.Param("doc_type", options=DOC_TYPES))
+    .filter(
+        knowledge_schema.policy_type
+        == sl.Param("policy_type", options=POLICY_TYPES)
+    )
+    .filter(
+        knowledge_schema.amenity_type
+        == sl.Param("amenity_type", options=AMENITY_TYPES)
     )
     .filter(knowledge_schema.room_type_id == sl.Param("room_type_id"))
     .filter(

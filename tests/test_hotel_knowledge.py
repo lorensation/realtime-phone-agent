@@ -8,31 +8,35 @@ from realtime_phone_agents.infrastructure.superlinked.service import (
     KnowledgeSearchService,
 )
 from realtime_phone_agents.knowledge.intent_router import (
+    detect_amenity_type,
     detect_intent,
+    detect_policy_type,
     extract_room_type_id,
 )
-from realtime_phone_agents.knowledge.loader import load_knowledge_bundle
+from realtime_phone_agents.knowledge.loader import load_knowledge_bundle, sha256_file
 from realtime_phone_agents.knowledge.models import Intent
 from realtime_phone_agents.knowledge.normalization import normalize_knowledge_bundle
 
 
-BUNDLE_PATH = Path("data/blue_sardine_kb/2026-03-24")
+BUNDLE_PATH = Path("data/blue_sardine_kb/2026-04-11")
 
 
 class LoaderTests(unittest.TestCase):
     def test_load_bundle_and_validate_inventory(self):
         bundle = load_knowledge_bundle(BUNDLE_PATH)
-        self.assertEqual(bundle.manifest.kb_version, "2026-03-24")
+        self.assertEqual(bundle.manifest.kb_version, "2026-04-11")
         self.assertEqual(
             bundle.pricing_inventory.pricing_and_inventory_internal.inventory_gap_units,
             1,
         )
         self.assertIn("standard_room", bundle.all_room_type_ids)
         self.assertIn("double_economic", bundle.all_room_type_ids)
+        self.assertEqual(len(bundle.dialogues.dialogues), 8)
+        self.assertEqual(len(bundle.operational_notes.notes), 6)
 
     def test_loader_detects_manifest_checksum_mismatch(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            target = Path(temp_dir) / "2026-03-24"
+            target = Path(temp_dir) / "2026-04-11"
             shutil.copytree(BUNDLE_PATH, target)
             manifest_path = target / "manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -44,7 +48,7 @@ class LoaderTests(unittest.TestCase):
 
     def test_loader_detects_unknown_room_type_reference(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            target = Path(temp_dir) / "2026-03-24"
+            target = Path(temp_dir) / "2026-04-11"
             shutil.copytree(BUNDLE_PATH, target)
             pricing_path = target / "pricing_inventory_internal.json"
             pricing = json.loads(pricing_path.read_text(encoding="utf-8"))
@@ -53,16 +57,12 @@ class LoaderTests(unittest.TestCase):
             ] = "unknown_room"
             pricing_path.write_text(json.dumps(pricing, indent=2), encoding="utf-8")
 
-            hotel_checksum = json.loads(
-                (target / "manifest.json").read_text(encoding="utf-8")
-            )
-            from realtime_phone_agents.knowledge.loader import sha256_file
-
-            hotel_checksum["files"]["pricing_inventory_internal.json"] = sha256_file(
+            manifest = json.loads((target / "manifest.json").read_text(encoding="utf-8"))
+            manifest["files"]["pricing_inventory_internal.json"] = sha256_file(
                 pricing_path
             )
             (target / "manifest.json").write_text(
-                json.dumps(hotel_checksum, indent=2), encoding="utf-8"
+                json.dumps(manifest, indent=2), encoding="utf-8"
             )
 
             with self.assertRaises(ValueError):
@@ -77,7 +77,11 @@ class NormalizationTests(unittest.TestCase):
         self.assertIn("overview_property", ids)
         self.assertIn("policy_pets", ids)
         self.assertIn("pricing_standard_room", ids)
-        self.assertIn("room_type_extension_double_economic", ids)
+        self.assertIn("dialogue_D09", ids)
+        self.assertIn("operational_note_address_conflict", ids)
+        self.assertTrue(
+            any(entry.doc_type == "faq" and entry.faq_id == "faq_parking" for entry in entries)
+        )
         self.assertTrue(
             any(
                 entry.id == "pricing_standard_room"
@@ -87,8 +91,9 @@ class NormalizationTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
-                entry.id == "room_type_extension_double_economic"
-                and entry.verification_state.value == "third_party"
+                entry.id == "dialogue_D16"
+                and entry.doc_type == "dialogue_exemplar"
+                and entry.requires_handoff
                 for entry in entries
             )
         )
@@ -118,6 +123,12 @@ class IntentRouterTests(unittest.TestCase):
             extract_room_type_id("Tell me about the budget double room"),
             "double_economic",
         )
+
+    def test_detect_policy_and_amenity_types(self):
+        self.assertEqual(detect_policy_type("Aceptais Visa?"), "payment")
+        self.assertEqual(detect_policy_type("Se puede fumar?"), "smoking")
+        self.assertEqual(detect_amenity_type("El desayuno esta incluido?"), "breakfast")
+        self.assertEqual(detect_amenity_type("Hay parking gratis?"), "parking")
 
 
 class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -179,25 +190,50 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    async def test_unverified_amenity_guardrail(self):
+    async def test_nearby_area_retrieval(self):
         response = await self.service.search_knowledge(
-            "Incluye 2 botellas de agua?", limit=3
+            "Que hay para visitar por ahi?", limit=3
         )
+        bodies = " ".join(item["body"] for item in response["results"])
+        self.assertIn("casco antiguo", bodies.lower())
+        self.assertIn("kayak", bodies.lower())
+
+    async def test_breakfast_unknown_marks_requires_handoff(self):
+        response = await self.service.search_knowledge(
+            "El desayuno esta incluido?", limit=3
+        )
+        self.assertTrue(any(item["requires_handoff"] for item in response["results"]))
         self.assertTrue(
-            any(
-                "no esta confirmado" in note.lower()
-                for note in response["guardrail_notes"]
-            )
-            or any(
-                "no confirma" in note.lower() for note in response["guardrail_notes"]
-            )
+            any("no se menciona desayuno" in item["body"].lower() for item in response["results"])
         )
 
-    async def test_english_query_keeps_policy_facts(self):
-        response = await self.service.search_knowledge("Are pets allowed?", limit=3)
-        self.assertEqual(response["resolved_intent"], Intent.POLICIES.value)
+    async def test_accessibility_unknown_marks_requires_handoff(self):
+        response = await self.service.search_knowledge(
+            "Teneis habitaciones adaptadas o acceso para silla de ruedas?", limit=3
+        )
+        self.assertTrue(any(item["requires_handoff"] for item in response["results"]))
         self.assertTrue(
-            any("mascotas" in item["body"].lower() for item in response["results"])
+            any("accesibilidad" in item["body"].lower() for item in response["results"])
+        )
+
+    async def test_address_conflict_retrieval_surfaces_handoff(self):
+        response = await self.service.search_knowledge(
+            "Necesito la direccion exacta para un taxi", limit=3
+        )
+        bodies = " ".join(item["body"] for item in response["results"])
+        self.assertIn("Calle Pescadores 1", bodies)
+        self.assertIn("Calle La Mar 54", bodies)
+        self.assertTrue(any(item["requires_handoff"] for item in response["results"]))
+
+    async def test_style_mode_returns_only_dialogues(self):
+        response = await self.service.search_knowledge(
+            "Como responderias a una duda de desayuno?",
+            limit=2,
+            search_mode="style",
+        )
+        self.assertTrue(response["results"])
+        self.assertTrue(
+            all(item["doc_type"] == "dialogue_exemplar" for item in response["results"])
         )
 
 

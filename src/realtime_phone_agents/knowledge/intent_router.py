@@ -253,3 +253,49 @@ def is_unverified_amenity_question(query: str) -> bool:
         "welcome water",
     }
     return any(term in normalized_query for term in amenity_terms)
+
+
+def detect_policy_type(query: str) -> str | None:
+    normalized_query = normalize_text(query)
+    mapping = {
+        "checkin": {"check in", "check-in", "checkin"},
+        "checkout": {"check out", "check-out", "checkout"},
+        "pets": {"mascota", "mascotas", "pet", "pets"},
+        "children": {"nino", "ninos", "children", "child", "adult"},
+        "smoking": {"fumar", "smoke", "smoking"},
+        "luggage": {"equipaje", "locker", "luggage", "consigna"},
+        "cancellation": {"cancel", "cancelacion", "refund", "reembolso"},
+        "payment": {"payment", "pago", "tarjeta", "card", "visa", "mastercard"},
+        "mobility": {"bici", "bicicleta", "patinete", "scooter"},
+    }
+    for policy_type, keywords in mapping.items():
+        if any(keyword in normalized_query for keyword in keywords):
+            return policy_type
+    return None
+
+
+def detect_amenity_type(query: str) -> str | None:
+    normalized_query = normalize_text(query)
+    mapping = {
+        "parking": {"parking", "aparcamiento"},
+        "wifi": {"wifi", "wi-fi", "internet"},
+        "breakfast": {"desayuno", "breakfast"},
+        "kitchen": {"cocina", "kitchen", "microondas", "microwave"},
+        "laundry": {"lavadora", "laundry", "washing machine"},
+        "television": {"tv", "television", "smart tv"},
+        "air_conditioning": {
+            "aire acondicionado",
+            "climatizacion",
+            "air conditioning",
+        },
+        "accessibility": {
+            "accesible",
+            "accessibility",
+            "wheelchair",
+            "silla de ruedas",
+        },
+    }
+    for amenity_type, keywords in mapping.items():
+        if any(keyword in normalized_query for keyword in keywords):
+            return amenity_type
+    return None

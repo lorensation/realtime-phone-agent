@@ -1,0 +1,88 @@
+{
+  "faq": [
+    {
+      "faq_id": "faq_checkin_checkout",
+      "q": "A que hora es el check-in y el check-out?",
+      "a": "El check-in es a partir de las 15:00 y el check-out debe hacerse antes de las 12:00.",
+      "section": "policies",
+      "policy_type": "checkin",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "faq_id": "faq_parking",
+      "q": "Hay parking?",
+      "a": "No hay parking dentro del alojamiento, pero hay parking publico gratuito a unos 200 metros andando. En condiciones generales se menciona Calle La Mar 98, detras de la estacion de tren.",
+      "section": "parking",
+      "amenity_type": "parking",
+      "sources": [
+        "https://bluesardinealtea.com/",
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "faq_id": "faq_pets",
+      "q": "Se admiten mascotas?",
+      "a": "No, no se permiten mascotas.",
+      "section": "policies",
+      "policy_type": "pets",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "faq_id": "faq_children",
+      "q": "Es un alojamiento solo para adultos?",
+      "a": "Segun las condiciones generales, esta orientado a adultos y se admiten ninos a partir de 10 anos.",
+      "section": "policies",
+      "policy_type": "children",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "faq_id": "faq_room_basics",
+      "q": "Que incluye el equipamiento basico en habitaciones?",
+      "a": "De forma general se publica wifi gratuito, climatizacion frio-calor, caja fuerte, nevera o minibar y Smart TV. En cada tipologia se listan tambien TV, minibar y amenities de bano.",
+      "section": "rooms",
+      "sources": [
+        "https://bluesardinealtea.com/",
+        "https://bluesardinealtea.com/en/standard-room/"
+      ]
+    },
+    {
+      "faq_id": "faq_breakfast_unknown",
+      "q": "El desayuno esta incluido?",
+      "a": "En las paginas revisadas no se menciona desayuno ni si esta incluido. Para no dar un dato incorrecto, hay que confirmarlo con el hotel.",
+      "section": "services",
+      "amenity_type": "breakfast",
+      "requires_handoff": true,
+      "sources": [
+        "https://bluesardinealtea.com/"
+      ]
+    },
+    {
+      "faq_id": "faq_accessibility_unknown",
+      "q": "Teneis habitaciones adaptadas o acceso para silla de ruedas?",
+      "a": "En las paginas revisadas no se describe accesibilidad, ascensor, escalones ni habitaciones adaptadas. Debe confirmarse con el hotel antes de reservar.",
+      "section": "operations",
+      "amenity_type": "accessibility",
+      "requires_handoff": true,
+      "sources": [
+        "https://bluesardinealtea.com/"
+      ]
+    },
+    {
+      "faq_id": "faq_address_conflict",
+      "q": "Cual es la direccion exacta para taxi o GPS?",
+      "a": "El sitio principal muestra Calle Pescadores 1, mientras que el motor de reservas muestra Calle La Mar 54. Para evitar un error con taxi o GPS, la direccion exacta debe confirmarse con el hotel.",
+      "section": "operations",
+      "requires_handoff": true,
+      "sources": [
+        "https://bluesardinealtea.com/en/contact/",
+        "https://booking.obehotel.com/help?hotel=4517R55E&lang=es"
+      ]
+    }
+  ]
+}

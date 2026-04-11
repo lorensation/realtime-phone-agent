@@ -216,6 +216,9 @@ class PricingInventoryData(StrictModel):
 class DocumentMetadata(StrictModel):
     source_priority: SourcePriority
     source_urls: list[str]
+    source_type: str = "official_site"
+    section: str | None = None
+    doc_type: str = "document"
     tags: list[str] = Field(default_factory=list)
 
 
@@ -232,13 +235,49 @@ class DocumentsData(StrictModel):
 
 
 class FAQItem(StrictModel):
+    faq_id: str | None = None
     q: str
     a: str
+    section: str | None = None
+    policy_type: str | None = None
+    amenity_type: str | None = None
+    requires_handoff: bool = False
     sources: list[str] = Field(default_factory=list)
 
 
 class FAQData(StrictModel):
     faq: list[FAQItem]
+
+
+class DialogueExample(StrictModel):
+    dialogue_id: str
+    language: str = "es-ES"
+    intent: str
+    difficulty: str
+    body: str
+    requires_handoff: bool = False
+    notes: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+
+
+class DialoguesData(StrictModel):
+    dialogues: list[DialogueExample]
+
+
+class OperationalNote(StrictModel):
+    note_id: str
+    title: str
+    body: str
+    section: str
+    confidence: str = "confirmed"
+    requires_handoff: bool = False
+    source_urls: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+
+
+class OperationalNotesData(StrictModel):
+    notes: list[OperationalNote]
 
 
 class HotelKnowledgeBundle(StrictModel):
@@ -248,6 +287,8 @@ class HotelKnowledgeBundle(StrictModel):
     pricing_inventory: PricingInventoryData
     faq: FAQData
     documents: DocumentsData
+    dialogues: DialoguesData
+    operational_notes: OperationalNotesData
     bundle_path: Path | None = Field(default=None, exclude=True)
 
     @property
@@ -265,6 +306,7 @@ class HotelKnowledgeBundle(StrictModel):
     @property
     def supported_languages(self) -> set[str]:
         languages = {document.language for document in self.documents.documents}
+        languages |= {dialogue.language for dialogue in self.dialogues.dialogues}
         return languages | {"es-ES"}
 
     @model_validator(mode="after")
@@ -305,6 +347,21 @@ class KnowledgeEntry(StrictModel):
     title: str
     body: str
     entity_type: str
+    hotel_id: str
+    hotel_name: str
+    brand_name: str
+    source_url: str
+    source_type: str
+    section: str
+    doc_type: str
+    room_type: str | None = None
+    amenity_type: str | None = None
+    policy_type: str | None = None
+    faq_id: str | None = None
+    dialogue_id: str | None = None
+    confidence: str
+    requires_handoff: bool = False
+    updated_at: str
     room_type_id: str | None = None
     language: str = "es-ES"
     source_priority: SourcePriority

@@ -1,0 +1,97 @@
+{
+  "notes": [
+    {
+      "note_id": "breakfast_unknown",
+      "title": "Breakfast is not confirmed in the public source",
+      "body": "The reviewed public pages do not mention breakfast or whether it is included. The agent must not infer breakfast availability from hotel category or booking norms. Offer to confirm with the hotel by phone or email.",
+      "section": "operations",
+      "confidence": "missing_public_info",
+      "requires_handoff": true,
+      "source_urls": [
+        "https://bluesardinealtea.com/"
+      ],
+      "tags": [
+        "breakfast",
+        "unknown"
+      ]
+    },
+    {
+      "note_id": "address_conflict",
+      "title": "Address discrepancy between site and booking engine",
+      "body": "The website contact page shows Calle Pescadores 1, while the booking engine pages show Calle La Mar 54. For taxi, GPS, transfers, or urgent wayfinding, the agent should not pick one confidently and should escalate for confirmation.",
+      "section": "operations",
+      "confidence": "conflicting_sources",
+      "requires_handoff": true,
+      "source_urls": [
+        "https://bluesardinealtea.com/en/contact/",
+        "https://booking.obehotel.com/help?hotel=4517R55E&lang=es"
+      ],
+      "tags": [
+        "address",
+        "taxi",
+        "conflict"
+      ]
+    },
+    {
+      "note_id": "front_desk_unknown",
+      "title": "Front desk hours are not documented",
+      "body": "The public sources mention reservation department phone hours, but do not document front-desk hours or 24 hour reception. The agent should not claim there is no reception or that late arrival support exists without confirmation.",
+      "section": "operations",
+      "confidence": "missing_public_info",
+      "requires_handoff": true,
+      "source_urls": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ],
+      "tags": [
+        "front_desk",
+        "late_arrival"
+      ]
+    },
+    {
+      "note_id": "accessibility_unknown",
+      "title": "Accessibility is not documented",
+      "body": "The reviewed public pages do not specify wheelchair access, elevator, step-free access, or adapted rooms. Accessibility questions should be escalated to hotel staff before the guest books.",
+      "section": "operations",
+      "confidence": "missing_public_info",
+      "requires_handoff": true,
+      "source_urls": [
+        "https://bluesardinealtea.com/"
+      ],
+      "tags": [
+        "accessibility",
+        "safety"
+      ]
+    },
+    {
+      "note_id": "payment_brand_unknown",
+      "title": "Card brand acceptance is not documented",
+      "body": "The terms only say that a valid credit or debit card is required. They do not confirm Visa, Mastercard, or other specific brands. If the caller asks for a card brand, the agent should say that it is not confirmed and offer to verify it with the hotel.",
+      "section": "operations",
+      "confidence": "missing_public_info",
+      "requires_handoff": true,
+      "source_urls": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ],
+      "tags": [
+        "payment",
+        "visa",
+        "mastercard"
+      ]
+    },
+    {
+      "note_id": "pricing_is_orientative",
+      "title": "Internal pricing is orientative only",
+      "body": "The internal pricing file is useful for approximate guidance but not for confirmed quotes. When dates are missing, ask for exact dates first. Without a live booking engine result, speak in orientative terms only and recommend confirming online or with the hotel team.",
+      "section": "pricing",
+      "confidence": "internal_unvalidated",
+      "requires_handoff": true,
+      "source_urls": [
+        "internal://pricing_inventory_internal"
+      ],
+      "tags": [
+        "pricing",
+        "guardrail"
+      ]
+    }
+  ]
+}

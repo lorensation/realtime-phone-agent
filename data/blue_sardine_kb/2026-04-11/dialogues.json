@@ -1,0 +1,129 @@
+{
+  "dialogues": [
+    {
+      "dialogue_id": "D08",
+      "language": "es-ES",
+      "intent": "breakfast_question",
+      "difficulty": "medium",
+      "requires_handoff": true,
+      "body": "Caller: El desayuno esta incluido? Agent: En las paginas que he revisado no se menciona desayuno ni si esta incluido. Caller: Como que no? Agent: Para no darle un dato incorrecto, prefiero confirmarlo con el hotel. Si quiere, le paso el telefono o el email.",
+      "notes": "No especular y ofrecer confirmacion humana.",
+      "tags": [
+        "breakfast",
+        "unknown",
+        "handoff"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D09",
+      "language": "es-ES",
+      "intent": "address_conflict",
+      "difficulty": "hard",
+      "requires_handoff": true,
+      "body": "Caller: Dame la direccion exacta, que el taxi me la pide ya. Agent: Entiendo la urgencia. En el sitio aparece Calle Pescadores 1, pero el motor de reservas muestra Calle La Mar 54. Agent: Para no mandarle al punto equivocado, necesito confirmarlo con el equipo ahora mismo.",
+      "notes": "Prioridad alta cuando piden taxi o GPS.",
+      "tags": [
+        "address",
+        "conflict",
+        "handoff"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D10",
+      "language": "es-ES",
+      "intent": "room_comparison",
+      "difficulty": "medium",
+      "requires_handoff": false,
+      "body": "Caller: Cual es la diferencia entre estandar y superior? Agent: La estandar indica 15 m2 y la superior 18 m2. Ambas son para 2 adultos y con cama doble. Caller: Y la de terraza? Agent: La Premium Room tiene terraza independiente y vistas al mar y al casco antiguo.",
+      "tags": [
+        "rooms",
+        "comparison"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D11",
+      "language": "es-ES",
+      "intent": "long_stay_kitchen",
+      "difficulty": "medium",
+      "requires_handoff": false,
+      "body": "Caller: Me quedo dos semanas. Teneis algo con microondas? Agent: Si. El Estudio con Terraza incluye microondas y esta pensado para estancias largas. Caller: Tiene cocina completa? Agent: El estudio menciona microondas y equipamiento basico, pero no cocina completa como los apartamentos.",
+      "tags": [
+        "long_stay",
+        "kitchen"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D13",
+      "language": "es-ES",
+      "intent": "smoking_exception",
+      "difficulty": "hard",
+      "requires_handoff": true,
+      "body": "Caller: Yo fumo, pero solo en la terraza, se puede? Agent: En condiciones generales se indica que es un espacio libre de humo y que incumplir puede generar cargos. Agent: No veo una excepcion publicada por terraza, asi que prefiero confirmarlo con el hotel.",
+      "tags": [
+        "smoking",
+        "handoff"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D16",
+      "language": "es-ES",
+      "intent": "front_desk_hours",
+      "difficulty": "hard",
+      "requires_handoff": true,
+      "body": "Caller: Teneis recepcion 24 horas? Agent: En la web no se detallan horarios de recepcion; solo se indica horario del departamento de reservas por telefono, de 10 a 17. Agent: Para confirmar el soporte fuera de horario, hay que consultarlo con el hotel.",
+      "tags": [
+        "front_desk",
+        "unknown",
+        "handoff"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D18",
+      "language": "es-ES",
+      "intent": "nearby_area_question",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Que hay para visitar por ahi? Agent: En su guia recomiendan el casco antiguo y la iglesia principal, y tambien rutas al aire libre y actividades como kayak. Caller: Genial. Agent: Si quiere, le doy una recomendacion rapida segun si prefiere paseo o playa.",
+      "tags": [
+        "nearby",
+        "activities"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D28",
+      "language": "en-US",
+      "intent": "english_operational_question",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Hello, check-in time? Agent: Yes. Check-in is after 3 PM, and check-out is before 12 PM. Caller: Great, and pets? Agent: No pets are allowed according to the general conditions.",
+      "tags": [
+        "english",
+        "policy"
+      ],
+      "sources": [
+        "internal://bluesardine-kb-deepresearch-report"
+      ]
+    }
+  ]
+}

@@ -36,6 +36,13 @@ async def _search_knowledge(search_request: SearchRequest, request: Request) -> 
             limit=search_request.limit,
             intent=search_request.intent,
             language=search_request.language,
+            hotel_id=search_request.hotel_id,
+            doc_types=search_request.doc_types,
+            section=search_request.section,
+            room_type_id=search_request.room_type_id,
+            policy_type=search_request.policy_type,
+            amenity_type=search_request.amenity_type,
+            search_mode=search_request.search_mode,
         )
         count = response.get("result_count", len(response.get("results", [])))
         return {
@@ -43,6 +50,7 @@ async def _search_knowledge(search_request: SearchRequest, request: Request) -> 
             "query": search_request.query,
             "limit": search_request.limit,
             "count": count,
+            "search_mode": search_request.search_mode,
             **response,
         }
     except Exception as exc:

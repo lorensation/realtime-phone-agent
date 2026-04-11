@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
-from realtime_phone_agents.knowledge.intent_router import extract_room_type_id
+from realtime_phone_agents.knowledge.intent_router import (
+    detect_amenity_type,
+    detect_policy_type,
+    extract_room_type_id,
+)
 from realtime_phone_agents.knowledge.models import (
     HotelKnowledgeBundle,
     KnowledgeEntry,
@@ -13,8 +17,8 @@ from realtime_phone_agents.knowledge.models import (
 )
 
 
-MAX_CHUNK_WORDS = 600
-CHUNK_OVERLAP_WORDS = 80
+MAX_CHUNK_WORDS = 220
+CHUNK_OVERLAP_WORDS = 40
 
 
 def normalize_knowledge_bundle(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]:
@@ -26,76 +30,155 @@ def normalize_knowledge_bundle(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
     entries.extend(_normalize_pricing_entries(bundle))
     entries.extend(_normalize_document_entries(bundle))
     entries.extend(_normalize_faq_entries(bundle))
+    entries.extend(_normalize_dialogue_entries(bundle))
+    entries.extend(_normalize_operational_note_entries(bundle))
     return entries
+
+
+def _hotel_metadata(bundle: HotelKnowledgeBundle) -> dict[str, str]:
+    return {
+        "hotel_id": "blue_sardine_altea",
+        "hotel_name": bundle.hotel.property.name,
+        "brand_name": "Blue Sardine",
+        "updated_at": bundle.manifest.generated_at,
+    }
+
+
+def _build_entry(
+    *,
+    bundle: HotelKnowledgeBundle,
+    entry_id: str,
+    title: str,
+    body: str,
+    entity_type: str,
+    section: str,
+    doc_type: str,
+    source_url: str,
+    source_type: str,
+    source_priority: SourcePriority,
+    verification_state: VerificationState,
+    language: str = "es-ES",
+    room_type_id: str | None = None,
+    amenity_type: str | None = None,
+    policy_type: str | None = None,
+    faq_id: str | None = None,
+    dialogue_id: str | None = None,
+    confidence: str = "confirmed",
+    requires_handoff: bool = False,
+    area_sqm: int = 0,
+    adults_max: int = 0,
+    base_price_eur: int = 0,
+    sources: list[str] | None = None,
+    tags: list[str] | None = None,
+) -> KnowledgeEntry:
+    hotel_meta = _hotel_metadata(bundle)
+    return KnowledgeEntry(
+        id=entry_id,
+        title=title,
+        body=body,
+        entity_type=entity_type,
+        hotel_id=hotel_meta["hotel_id"],
+        hotel_name=hotel_meta["hotel_name"],
+        brand_name=hotel_meta["brand_name"],
+        language=language,
+        source_url=source_url,
+        source_type=source_type,
+        section=section,
+        doc_type=doc_type,
+        room_type=room_type_id,
+        amenity_type=amenity_type,
+        policy_type=policy_type,
+        faq_id=faq_id,
+        dialogue_id=dialogue_id,
+        confidence=confidence,
+        requires_handoff=requires_handoff,
+        updated_at=hotel_meta["updated_at"],
+        room_type_id=room_type_id,
+        source_priority=source_priority,
+        verification_state=verification_state,
+        area_sqm=area_sqm,
+        adults_max=adults_max,
+        base_price_eur=base_price_eur,
+        version=bundle.manifest.kb_version,
+        sources=sources or [source_url],
+        tags=tags or [],
+    )
 
 
 def _normalize_property_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]:
     hotel = bundle.hotel
     contact = hotel.property.contact
     return [
-        KnowledgeEntry(
-            id="overview_property",
+        _build_entry(
+            bundle=bundle,
+            entry_id="overview_property",
             title=hotel.property.name,
             body=(
-                f"{hotel.property.name} es un alojamiento boutique en un antiguo barrio de pescadores, "
-                f"cerca del mar y al inicio del casco historico de Altea. "
-                f"Direccion: {hotel.property.address_public}."
+                f"{hotel.property.name} es un alojamiento boutique en un antiguo barrio de "
+                f"pescadores, cerca del mar y al inicio del casco historico de Altea. "
+                f"Direccion publicada: {hotel.property.address_public}."
             ),
             entity_type="overview",
-            language="es-ES",
+            section="overview",
+            doc_type="structured_fact",
+            source_url="https://bluesardinealtea.com/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/"],
             tags=["overview", "location", "boutique"],
         ),
-        KnowledgeEntry(
-            id="location_address",
+        _build_entry(
+            bundle=bundle,
+            entry_id="location_address",
             title="Ubicacion y direccion",
             body=(
-                f"El alojamiento esta en {hotel.property.address_public}, cerca del mar y del casco historico de Altea."
+                f"El alojamiento publica la direccion {hotel.property.address_public} y lo "
+                "describe como cercano al mar y al casco historico de Altea."
             ),
             entity_type="location",
-            language="es-ES",
+            section="location",
+            doc_type="structured_fact",
+            source_url="https://bluesardinealtea.com/en/contact/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/"],
             tags=["location", "address"],
         ),
-        KnowledgeEntry(
-            id="contact_primary",
+        _build_entry(
+            bundle=bundle,
+            entry_id="contact_primary",
             title="Contacto del alojamiento",
             body=(
-                f"Telefono de contacto: {contact.phone}. Email: {contact.email}. "
-                "Si falta un dato confirmado, se recomienda confirmar por telefono o email."
+                f"Telefono de contacto: {contact.phone}. Email: {contact.email}. Si falta "
+                "un dato confirmado, se recomienda confirmarlo por telefono o email."
             ),
             entity_type="contact",
-            language="es-ES",
+            section="contact",
+            doc_type="structured_fact",
+            source_url="https://bluesardinealtea.com/en/contact/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/"],
             tags=["contact"],
         ),
-        KnowledgeEntry(
-            id="parking_public_free",
+        _build_entry(
+            bundle=bundle,
+            entry_id="parking_public_free",
             title="Parking publico gratuito",
             body=(
                 "No hay parking dentro del alojamiento. Hay parking publico gratuito a unos "
                 f"{hotel.parking.public_free_parking.walking_distance_m} metros andando. "
-                f"Referencia: {hotel.parking.public_free_parking.location_note}. "
+                f"Referencia publicada: {hotel.parking.public_free_parking.location_note}. "
                 f"Nota: {hotel.parking.public_free_parking.liability_note}."
             ),
             entity_type="parking",
-            language="es-ES",
+            section="parking",
+            doc_type="structured_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=[
-                "https://bluesardinealtea.com/",
-                "https://bluesardinealtea.com/en/general-conditions/",
-            ],
+            amenity_type="parking",
             tags=["parking", "location"],
         ),
     ]
@@ -109,8 +192,10 @@ def _normalize_service_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
             title="Servicios de experiencia",
             body_prefix="Servicios destacados",
             entity_type="service",
+            section="services",
             tokens=services.experience,
             bundle=bundle,
+            amenity_type="guest_experience",
             tags=["services", "experience"],
         ),
         _entry_from_token_list(
@@ -118,8 +203,10 @@ def _normalize_service_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
             title="Limpieza y confort",
             body_prefix="Limpieza y confort",
             entity_type="service",
+            section="services",
             tokens=services.housekeeping,
             bundle=bundle,
+            amenity_type="housekeeping",
             tags=["services", "housekeeping"],
         ),
         _entry_from_token_list(
@@ -127,8 +214,10 @@ def _normalize_service_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
             title="Equipamiento general",
             body_prefix="Equipamiento general",
             entity_type="service",
+            section="services",
             tokens=services.in_room_and_property,
             bundle=bundle,
+            amenity_type="facilities",
             tags=["services", "facilities"],
         ),
     ]
@@ -137,131 +226,163 @@ def _normalize_service_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
 def _normalize_policy_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]:
     policies = bundle.hotel.policies
     return [
-        KnowledgeEntry(
-            id="policy_checkin_checkout",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_checkin_checkout",
             title="Check-in y check-out",
             body=(
-                f"El check-in es a partir de las {policies.check_in} y el check-out debe hacerse antes de las "
-                f"{policies.check_out}."
+                f"El check-in es a partir de las {policies.check_in} y el check-out debe "
+                f"hacerse antes de las {policies.check_out}."
             ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="checkin",
             tags=["policy", "checkin", "checkout"],
         ),
-        KnowledgeEntry(
-            id="policy_luggage",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_luggage",
             title="Consigna y salida",
             body=(
-                "Hay taquillas gratuitas para equipaje y un sistema de buzon para dejar las llaves a la salida."
+                "Hay taquillas gratuitas para equipaje y un sistema de buzon para dejar "
+                "las llaves a la salida."
             ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="luggage",
             tags=["policy", "luggage"],
         ),
-        KnowledgeEntry(
-            id="policy_adults_children",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_adults_children",
             title="Politica de adultos y menores",
             body=(
                 "El alojamiento esta orientado a adultos y admite ninos a partir de "
                 f"{policies.adults_and_children.children_allowed_from_age} anos."
             ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="children",
             tags=["policy", "adults", "children"],
         ),
-        KnowledgeEntry(
-            id="policy_smoke_free",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_smoke_free",
             title="Politica de humo",
             body="El establecimiento es smoke-free y fumar puede conllevar cargos.",
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="smoking",
             tags=["policy", "smoking"],
         ),
-        KnowledgeEntry(
-            id="policy_pets",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_pets",
             title="Mascotas",
             body="No se permiten mascotas.",
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="pets",
             tags=["policy", "pets"],
         ),
-        KnowledgeEntry(
-            id="policy_bicycles_scooters",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_bicycles_scooters",
             title="Bicicletas y patinetes",
-            body="No se permiten bicicletas ni patinetes electricos dentro del alojamiento ni en las habitaciones.",
+            body=(
+                "No se permiten bicicletas ni patinetes electricos dentro del "
+                "alojamiento ni en las habitaciones."
+            ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="mobility",
             tags=["policy", "bicycles", "scooters"],
         ),
-        KnowledgeEntry(
-            id="policy_reservation_hours",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_reservation_hours",
             title="Horario de reservas",
             body=(
                 f"Atencion telefonica: {policies.reservation_hours.phone_support}. "
                 f"Reservas web: {policies.reservation_hours.website_booking}."
             ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="reservation_hours",
             tags=["policy", "reservations"],
         ),
-        KnowledgeEntry(
-            id="policy_payment_cancellation",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_payment_cancellation",
             title="Pago y cancelacion",
             body=(
-                "Se requiere tarjeta valida. La cancelacion gratuita aplica hasta 5 dias antes de la llegada. "
-                "No se permiten cambios de fecha dentro de los 5 dias previos. "
-                "En tarifa no reembolsable no se permiten cancelaciones ni modificaciones. "
-                "La fuerza mayor queda sujeta a revision del equipo de reservas."
+                "Se requiere tarjeta valida. La cancelacion gratuita aplica hasta 5 dias "
+                "antes de la llegada. No se permiten cambios de fecha dentro de los 5 "
+                "dias previos. En tarifa no reembolsable no se permiten cancelaciones ni "
+                "modificaciones. La fuerza mayor queda sujeta a revision del equipo de "
+                "reservas."
             ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="cancellation",
             tags=["policy", "payment", "cancellation"],
         ),
-        KnowledgeEntry(
-            id="policy_damages",
+        _build_entry(
+            bundle=bundle,
+            entry_id="policy_damages",
             title="Cargos por danos y perdidas",
             body=(
-                "Se aplican cargos por danos y perdidas. Toalla pequena: 10 EUR. "
-                "Toalla grande: 15 EUR. Los elementos decorativos se cobran segun su valor."
+                "Se aplican cargos por danos y perdidas. Toalla pequena: 10 EUR. Toalla "
+                "grande: 15 EUR. Los elementos decorativos se cobran segun su valor."
             ),
             entity_type="policy",
-            language="es-ES",
+            section="policies",
+            doc_type="policy_fact",
+            source_url="https://bluesardinealtea.com/en/general-conditions/",
+            source_type="official_site",
             source_priority=SourcePriority.OFFICIAL,
             verification_state=VerificationState.OFFICIAL,
-            version=bundle.manifest.kb_version,
-            sources=["https://bluesardinealtea.com/en/general-conditions/"],
+            policy_type="damages",
             tags=["policy", "damages"],
         ),
     ]
@@ -291,43 +412,49 @@ def _normalize_room_type_entries(bundle: HotelKnowledgeBundle) -> list[Knowledge
                 + ", ".join(_humanize_token(token) for token in room_type.features)
             )
         entries.append(
-            KnowledgeEntry(
-                id=f"room_type_{room_type.id}",
+            _build_entry(
+                bundle=bundle,
+                entry_id=f"room_type_{room_type.id}",
                 title=room_type.display_name_es,
                 body=". ".join(details) + ".",
                 entity_type="room_type",
-                room_type_id=room_type.id,
-                language="es-ES",
+                section="rooms",
+                doc_type="room_fact",
+                source_url="https://bluesardinealtea.com/",
+                source_type="official_site",
                 source_priority=SourcePriority.OFFICIAL,
                 verification_state=VerificationState.OFFICIAL,
+                room_type_id=room_type.id,
                 area_sqm=room_type.area_sqm or 0,
                 adults_max=room_type.occupancy.adults_max,
-                version=bundle.manifest.kb_version,
-                sources=["https://bluesardinealtea.com/"],
                 tags=["room_type", room_type.id],
             )
         )
 
     for extension in bundle.room_types.room_type_extensions:
         entries.append(
-            KnowledgeEntry(
-                id=f"room_type_extension_{extension.id}",
+            _build_entry(
+                bundle=bundle,
+                entry_id=f"room_type_extension_{extension.id}",
                 title=extension.display_name_es,
                 body=(
-                    f"{extension.display_name_es} aparece en canales externos, pero no esta descrita con detalle en la web principal. "
+                    f"{extension.display_name_es} aparece en canales externos, pero no "
+                    "esta descrita con detalle en la web principal. "
                     f"Nota: {extension.notes}"
                 ),
                 entity_type="room_type",
-                room_type_id=extension.id,
-                language="es-ES",
+                section="rooms",
+                doc_type="room_fact",
+                source_url="https://www.google.com/travel/hotels",
+                source_type="third_party",
                 source_priority=SourcePriority.THIRD_PARTY,
                 verification_state=VerificationState.THIRD_PARTY,
-                version=bundle.manifest.kb_version,
-                sources=["https://www.google.com/travel/hotels"],
+                room_type_id=extension.id,
+                confidence="unconfirmed",
+                requires_handoff=extension.needs_internal_validation,
                 tags=["room_type", extension.id, "unverified"],
             )
         )
-
     return entries
 
 
@@ -345,42 +472,53 @@ def _normalize_pricing_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
     )
 
     entries = [
-        KnowledgeEntry(
-            id="pricing_summary",
+        _build_entry(
+            bundle=bundle,
+            entry_id="pricing_summary",
             title="Precios orientativos e inventario interno",
             body=(
-                "Los precios base internos son orientativos, pueden variar por temporada y ocupacion, "
-                "y requieren confirmacion final. La configuracion interna actual suma "
-                f"{pricing.inventory_sum_units} unidades y mantiene una discrepancia interna de "
-                f"{pricing.inventory_gap_units} unidad frente a una pista externa de 21."
+                "Los precios base internos son orientativos, pueden variar por temporada "
+                "y ocupacion, y requieren confirmacion final. La configuracion interna "
+                f"actual suma {pricing.inventory_sum_units} unidades y mantiene una "
+                f"discrepancia interna de {pricing.inventory_gap_units} unidad frente a "
+                "la referencia externa de 21."
             ),
             entity_type="pricing",
-            language="es-ES",
+            section="pricing",
+            doc_type="structured_fact",
+            source_url="internal://pricing_inventory_internal",
+            source_type="internal_config",
             source_priority=SourcePriority.INTERNAL_UNVALIDATED,
             verification_state=VerificationState.INTERNAL_UNVALIDATED,
-            version=bundle.manifest.kb_version,
-            sources=["internal://pricing_inventory_internal"],
+            confidence="orientative",
+            requires_handoff=True,
             tags=["pricing", "inventory"],
         )
     ]
 
     for item in pricing.inventory_breakdown:
         entries.append(
-            KnowledgeEntry(
-                id=f"pricing_{item.room_type_id}",
+            _build_entry(
+                bundle=bundle,
+                entry_id=f"pricing_{item.room_type_id}",
                 title=f"Precio orientativo {room_display_names[item.room_type_id]}",
                 body=(
-                    f"Precio base interno orientativo desde {item.base_price_eur} EUR para {room_display_names[item.room_type_id]}. "
-                    f"Configuracion actual: {item.units} unidades. Dato interno pendiente de validacion y sujeto a temporada y ocupacion."
+                    f"Precio base interno orientativo desde {item.base_price_eur} EUR "
+                    f"para {room_display_names[item.room_type_id]}. Configuracion "
+                    f"actual: {item.units} unidades. Dato interno pendiente de "
+                    "validacion y sujeto a temporada y ocupacion."
                 ),
                 entity_type="pricing",
-                room_type_id=item.room_type_id,
-                language="es-ES",
+                section="pricing",
+                doc_type="structured_fact",
+                source_url="internal://pricing_inventory_internal",
+                source_type="internal_config",
                 source_priority=SourcePriority.INTERNAL_UNVALIDATED,
                 verification_state=VerificationState.INTERNAL_UNVALIDATED,
+                room_type_id=item.room_type_id,
                 base_price_eur=item.base_price_eur,
-                version=bundle.manifest.kb_version,
-                sources=["internal://pricing_inventory_internal"],
+                confidence="orientative",
+                requires_handoff=True,
                 tags=["pricing", item.room_type_id],
             )
         )
@@ -398,21 +536,28 @@ def _normalize_document_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeE
         chunks = _split_body(document.body)
         for index, chunk in enumerate(chunks, start=1):
             chunk_suffix = f"_chunk_{index}" if len(chunks) > 1 else ""
+            room_type_id = extract_room_type_id(document.title + " " + document.body)
+            policy_type = detect_policy_type(document.title + " " + document.body)
+            amenity_type = detect_amenity_type(document.title + " " + document.body)
             entries.append(
-                KnowledgeEntry(
-                    id=f"document_{document.doc_id}{chunk_suffix}",
+                _build_entry(
+                    bundle=bundle,
+                    entry_id=f"document_{document.doc_id}{chunk_suffix}",
                     title=document.title,
                     body=chunk,
                     entity_type=entity_type,
-                    room_type_id=extract_room_type_id(
-                        document.title + " " + document.body
-                    ),
-                    language=document.language,
+                    section=document.metadata.section or _section_for_entity_type(entity_type),
+                    doc_type=document.metadata.doc_type,
+                    source_url=document.metadata.source_urls[0],
+                    source_type=document.metadata.source_type,
                     source_priority=document.metadata.source_priority,
                     verification_state=_priority_to_verification(
                         document.metadata.source_priority
                     ),
-                    version=bundle.manifest.kb_version,
+                    room_type_id=room_type_id,
+                    amenity_type=amenity_type,
+                    policy_type=policy_type,
+                    language=document.language,
                     sources=document.metadata.source_urls,
                     tags=document.metadata.tags,
                 )
@@ -425,17 +570,25 @@ def _normalize_faq_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]
     for index, item in enumerate(bundle.faq.faq, start=1):
         combined_text = f"{item.q} {item.a}"
         entity_type = _classify_entity_type(combined_text)
+        faq_id = item.faq_id or f"faq_{index}"
         entries.append(
-            KnowledgeEntry(
-                id=f"faq_{index}",
+            _build_entry(
+                bundle=bundle,
+                entry_id=faq_id,
                 title=item.q,
                 body=item.a,
                 entity_type=entity_type,
-                room_type_id=extract_room_type_id(combined_text),
-                language="es-ES",
+                section=item.section or _section_for_entity_type(entity_type),
+                doc_type="faq",
+                source_url=(item.sources[0] if item.sources else "https://bluesardinealtea.com/"),
+                source_type="official_site",
                 source_priority=SourcePriority.OFFICIAL,
                 verification_state=VerificationState.OFFICIAL,
-                version=bundle.manifest.kb_version,
+                room_type_id=extract_room_type_id(combined_text),
+                amenity_type=item.amenity_type or detect_amenity_type(combined_text),
+                policy_type=item.policy_type or detect_policy_type(combined_text),
+                faq_id=faq_id,
+                requires_handoff=item.requires_handoff,
                 sources=item.sources,
                 tags=["faq", entity_type],
             )
@@ -443,28 +596,91 @@ def _normalize_faq_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]
     return entries
 
 
+def _normalize_dialogue_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEntry]:
+    entries: list[KnowledgeEntry] = []
+    for dialogue in bundle.dialogues.dialogues:
+        room_type_id = extract_room_type_id(dialogue.body)
+        entries.append(
+            _build_entry(
+                bundle=bundle,
+                entry_id=f"dialogue_{dialogue.dialogue_id}",
+                title=f"Dialogo {dialogue.dialogue_id}: {dialogue.intent}",
+                body=dialogue.body,
+                entity_type="dialogue",
+                section="operations",
+                doc_type="dialogue_exemplar",
+                source_url=dialogue.sources[0] if dialogue.sources else "internal://dialogues",
+                source_type="internal_dialogue",
+                source_priority=SourcePriority.INTERNAL_VALIDATED,
+                verification_state=VerificationState.INTERNAL_VALIDATED,
+                language=dialogue.language,
+                room_type_id=room_type_id,
+                amenity_type=detect_amenity_type(dialogue.body),
+                policy_type=detect_policy_type(dialogue.body),
+                dialogue_id=dialogue.dialogue_id,
+                confidence="style_reference",
+                requires_handoff=dialogue.requires_handoff,
+                sources=dialogue.sources,
+                tags=["dialogue", dialogue.intent, *dialogue.tags],
+            )
+        )
+    return entries
+
+
+def _normalize_operational_note_entries(
+    bundle: HotelKnowledgeBundle,
+) -> list[KnowledgeEntry]:
+    return [
+        _build_entry(
+            bundle=bundle,
+            entry_id=f"operational_note_{note.note_id}",
+            title=note.title,
+            body=note.body,
+            entity_type="operational_note",
+            section=note.section,
+            doc_type="operational_note",
+            source_url=note.source_urls[0] if note.source_urls else "internal://operations",
+            source_type="internal_operational_note",
+            source_priority=SourcePriority.INTERNAL_VALIDATED,
+            verification_state=VerificationState.INTERNAL_VALIDATED,
+            amenity_type=detect_amenity_type(note.body),
+            policy_type=detect_policy_type(note.body),
+            confidence=note.confidence,
+            requires_handoff=note.requires_handoff,
+            sources=note.source_urls,
+            tags=["operational_note", note.section, *note.tags],
+        )
+        for note in bundle.operational_notes.notes
+    ]
+
+
 def _entry_from_token_list(
     entry_id: str,
     title: str,
     body_prefix: str,
     entity_type: str,
+    section: str,
     tokens: Iterable[str],
     bundle: HotelKnowledgeBundle,
+    amenity_type: str,
     tags: list[str],
 ) -> KnowledgeEntry:
     body = (
         body_prefix + ": " + ", ".join(_humanize_token(token) for token in tokens) + "."
     )
-    return KnowledgeEntry(
-        id=entry_id,
+    return _build_entry(
+        bundle=bundle,
+        entry_id=entry_id,
         title=title,
         body=body,
         entity_type=entity_type,
-        language="es-ES",
+        section=section,
+        doc_type="structured_fact",
+        source_url="https://bluesardinealtea.com/",
+        source_type="official_site",
         source_priority=SourcePriority.OFFICIAL,
         verification_state=VerificationState.OFFICIAL,
-        version=bundle.manifest.kb_version,
-        sources=["https://bluesardinealtea.com/"],
+        amenity_type=amenity_type,
         tags=tags,
     )
 
@@ -522,6 +738,19 @@ def _classify_entity_type(text: str) -> str:
     if extract_room_type_id(normalized_text):
         return "room_type"
     return "overview"
+
+
+def _section_for_entity_type(entity_type: str) -> str:
+    mapping = {
+        "parking": "parking",
+        "location": "location",
+        "policy": "policies",
+        "pricing": "pricing",
+        "service": "services",
+        "room_type": "rooms",
+        "contact": "contact",
+    }
+    return mapping.get(entity_type, "overview")
 
 
 def _split_body(text: str) -> list[str]:

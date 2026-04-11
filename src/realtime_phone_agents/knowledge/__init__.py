@@ -1,6 +1,8 @@
 from realtime_phone_agents.knowledge.intent_router import (
     build_room_type_aliases,
+    detect_amenity_type,
     detect_intent,
+    detect_policy_type,
     extract_area_sqm_hint,
     extract_base_price_hint,
     extract_room_type_id,
@@ -24,7 +26,9 @@ __all__ = [
     "SourcePriority",
     "VerificationState",
     "build_room_type_aliases",
+    "detect_amenity_type",
     "detect_intent",
+    "detect_policy_type",
     "extract_area_sqm_hint",
     "extract_base_price_hint",
     "extract_room_type_id",

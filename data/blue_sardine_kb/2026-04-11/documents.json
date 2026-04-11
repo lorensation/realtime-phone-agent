@@ -1,0 +1,127 @@
+{
+  "documents": [
+    {
+      "doc_id": "bs_overview_es",
+      "language": "es-ES",
+      "title": "Resumen del alojamiento y propuesta de valor",
+      "body": "Alojamiento boutique restaurado en un antiguo barrio de pescadores, cerca del mar y al inicio del casco historico. Ofrece habitaciones y apartamentos con enfoque en confort moderno, detalle en diseno y apoyo tecnologico para la estancia.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/"
+        ],
+        "source_type": "official_site",
+        "section": "overview",
+        "doc_type": "document",
+        "tags": [
+          "overview",
+          "location",
+          "boutique"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_services_es",
+      "language": "es-ES",
+      "title": "Servicios, limpieza y equipamiento",
+      "body": "Servicios destacados: atencion personalizada, apoyo tecnologico para aperturas y registros, informacion turistica y opciones para celebraciones. Limpieza: servicio de limpieza, amenities, toallas, sabanas y almohadas confortables. Equipamiento: wifi gratuito, climatizacion frio-calor, caja fuerte, nevera o minibar, Smart TV, taquillas y almacenamiento de equipaje.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/"
+        ],
+        "source_type": "official_site",
+        "section": "services",
+        "doc_type": "document",
+        "tags": [
+          "services",
+          "housekeeping",
+          "amenities",
+          "facilities"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_parking_es",
+      "language": "es-ES",
+      "title": "Parking",
+      "body": "Hay parking publico gratuito aproximadamente a 200 metros andando. En condiciones generales se indica como referencia Calle La Mar 98, detras de la estacion de tren, y que no hay responsabilidad por robos o danos en el parking.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/",
+          "https://bluesardinealtea.com/en/general-conditions/"
+        ],
+        "source_type": "official_site",
+        "section": "parking",
+        "doc_type": "document",
+        "tags": [
+          "parking",
+          "location"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_policies_es",
+      "language": "es-ES",
+      "title": "Condiciones generales: horarios y normas",
+      "body": "Check-in a partir de las 15:00 y check-out antes de las 12:00. Hay taquillas gratuitas para equipaje y un sistema para dejar llaves. Alojamiento orientado a adultos y ninos mayores de 10. Espacio sin humo. No se permiten mascotas. No se permiten bicicletas ni patinetes electricos dentro. Se aplican cargos por danos o perdida, por ejemplo toallas.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/en/general-conditions/"
+        ],
+        "source_type": "official_site",
+        "section": "policies",
+        "doc_type": "document",
+        "tags": [
+          "policies",
+          "checkin",
+          "checkout",
+          "rules"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_directions_es",
+      "language": "es-ES",
+      "title": "Como llegar desde el aeropuerto y transporte publico",
+      "body": "La guia del hotel indica que el Aeropuerto de Alicante-Elche esta a unos 60 kilometros. Propone transfer o bus, o combinar C6 hasta Luceros y luego TRAM hacia Altea. Tambien menciona coche de alquiler. La estacion de TRAM de Altea se describe a unos 200 metros del alojamiento.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/en/getting-to-altea-from-alicante-elche-airport-alc/",
+          "https://bluesardinealtea.com/formas-de-llegar-a-altea-desde-el-aeropuerto-de-alicante-elche/"
+        ],
+        "source_type": "official_site",
+        "section": "location",
+        "doc_type": "document",
+        "tags": [
+          "directions",
+          "tram",
+          "airport"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_nearby_area_es",
+      "language": "es-ES",
+      "title": "Que ver cerca de Blue Sardine Altea",
+      "body": "En la guia del hotel se recomiendan el casco antiguo de Altea, la Iglesia de Nuestra Senora del Consuelo, rutas al aire libre como Sierra de Bernia y Ruta de La Olla, y actividades como kayak o la ruta hacia el Faro del Albir. Se debe responder de forma general, sin inventar distancias no publicadas.",
+      "metadata": {
+        "source_priority": "official",
+        "source_urls": [
+          "https://bluesardinealtea.com/en/live-an-unforgettable-weekend-in-altea/"
+        ],
+        "source_type": "official_site",
+        "section": "location",
+        "doc_type": "document",
+        "tags": [
+          "nearby",
+          "old_town",
+          "activities"
+        ]
+      }
+    }
+  ]
+}

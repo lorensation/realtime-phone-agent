@@ -45,12 +45,20 @@ class SuperlinkedSettings(BaseModel):
 # --- Knowledge Base Configuration ---
 class KnowledgeBaseSettings(BaseModel):
     default_bundle_path: str = Field(
-        default="data/blue_sardine_kb/2026-03-24",
+        default="data/blue_sardine_kb/2026-04-11",
         description="Default versioned knowledge bundle path to auto-ingest at startup",
     )
     auto_ingest_default_bundle: bool = Field(
         default=True,
         description="Automatically ingest the default knowledge bundle at startup",
+    )
+    collection_name: str = Field(
+        default="hotel-knowledge",
+        description="Superlinked/Qdrant collection name used for hotel knowledge",
+    )
+    default_hotel_id: str = Field(
+        default="blue_sardine_altea",
+        description="Default hotel identifier used for retrieval and routing",
     )
 
 
@@ -151,6 +159,41 @@ class OpikSettings(BaseModel):
     project_name: str = Field(default="", description="Opik project name")
 
 
+class PromptComponentSettings(BaseModel):
+    name: str
+    commit: str = Field(
+        default="",
+        description="Pinned Opik prompt commit. Empty means fetch latest.",
+    )
+
+
+class PromptSettings(BaseModel):
+    remote_enabled: bool = Field(
+        default=True,
+        description="Fetch prompts from Opik when configured before using local fallbacks",
+    )
+    core: PromptComponentSettings = Field(
+        default_factory=lambda: PromptComponentSettings(
+            name="blue_sardine.receptionist.core"
+        )
+    )
+    retrieval: PromptComponentSettings = Field(
+        default_factory=lambda: PromptComponentSettings(
+            name="blue_sardine.receptionist.retrieval"
+        )
+    )
+    escalation: PromptComponentSettings = Field(
+        default_factory=lambda: PromptComponentSettings(
+            name="blue_sardine.receptionist.escalation"
+        )
+    )
+    style: PromptComponentSettings = Field(
+        default_factory=lambda: PromptComponentSettings(
+            name="blue_sardine.receptionist.style"
+        )
+    )
+
+
 # --- Call Flow Configuration ---
 class CallFlowSettings(BaseModel):
     language_selection_enabled: bool = Field(
@@ -164,6 +207,18 @@ class CallFlowSettings(BaseModel):
     ringback_seconds: float = Field(
         default=2.0,
         description="Duration of the pre-agent ringback tone",
+    )
+    tool_use_preamble_mode: str = Field(
+        default="auto",
+        description="Tool-use preamble policy: auto, always, or never",
+    )
+    lookup_sound_mode: str = Field(
+        default="auto",
+        description="Lookup sound policy: auto, always, or never",
+    )
+    lookup_latency_threshold_ms: int = Field(
+        default=1200,
+        description="Latency threshold before optional lookup cues are allowed",
     )
 
 
@@ -183,6 +238,7 @@ class Settings(BaseSettings):
     together: TogetherTTSSettings = Field(default_factory=TogetherTTSSettings)
     elevenlabs: ElevenLabsSettings = Field(default_factory=ElevenLabsSettings)
     opik: OpikSettings = Field(default_factory=OpikSettings)
+    prompts: PromptSettings = Field(default_factory=PromptSettings)
     call_flow: CallFlowSettings = Field(default_factory=CallFlowSettings)
     stt_model: str = Field(
         default="faster-whisper",

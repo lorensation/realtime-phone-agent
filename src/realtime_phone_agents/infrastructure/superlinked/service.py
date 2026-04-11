@@ -1,20 +1,25 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 from loguru import logger
+
+from realtime_phone_agents.agent.retrieval import build_retrieval_context
+from realtime_phone_agents.config import settings
+
+os.environ.setdefault("APP_ID", settings.knowledge_base.collection_name)
+
 from superlinked import framework as sl
 
-from realtime_phone_agents.config import settings
 from realtime_phone_agents.knowledge import (
     Intent,
     VerificationState,
     detect_intent,
     extract_area_sqm_hint,
     extract_base_price_hint,
-    extract_room_type_id,
     has_explicit_stay_dates,
     is_unverified_amenity_question,
     load_knowledge_bundle,
@@ -63,7 +68,7 @@ class KnowledgeSearchService:
             self._setup_with_qdrant()
         except Exception as exc:
             logger.warning(
-                f"Qdrant setup failed, falling back to InMemoryExecutor: {exc}"
+                "Qdrant setup failed, falling back to InMemoryExecutor: {}", exc
             )
             self._setup_with_memory()
 
@@ -77,7 +82,11 @@ class KnowledgeSearchService:
             default_query_limit=5,
         )
 
-        logger.info(f"Connecting to Qdrant at {qdrant_url} ...")
+        logger.info(
+            "Connecting to Qdrant at {} using collection '{}'.",
+            qdrant_url,
+            settings.knowledge_base.collection_name,
+        )
 
         self.source = sl.RestSource(
             knowledge_schema, parser=sl.DataFrameParser(schema=knowledge_schema)
@@ -110,7 +119,7 @@ class KnowledgeSearchService:
 
         default_path = Path(settings.knowledge_base.default_bundle_path)
         if not default_path.exists():
-            logger.warning(f"Default knowledge bundle path not found: {default_path}")
+            logger.warning("Default knowledge bundle path not found: {}", default_path)
             return
         if self.loaded_bundle_path == str(default_path.resolve()):
             return
@@ -126,17 +135,30 @@ class KnowledgeSearchService:
         self.loaded_bundle_path = str(Path(bundle_path).resolve())
 
         logger.info(
-            f"Ingested knowledge bundle {bundle.manifest.kb_version} with {len(entries)} entries"
+            "Ingested knowledge bundle {} with {} entries into '{}'.",
+            bundle.manifest.kb_version,
+            len(entries),
+            settings.knowledge_base.collection_name,
         )
         return {
             "bundle_path": self.loaded_bundle_path,
             "version": bundle.manifest.kb_version,
             "entry_count": len(entries),
+            "collection_name": settings.knowledge_base.collection_name,
         }
 
     def _entry_to_row(self, entry: KnowledgeEntry) -> dict[str, Any]:
         row = entry.model_dump(mode="json")
-        row["room_type_id"] = row["room_type_id"] or ""
+        for key in (
+            "room_type",
+            "room_type_id",
+            "amenity_type",
+            "policy_type",
+            "faq_id",
+            "dialogue_id",
+        ):
+            row[key] = row[key] or ""
+        row["requires_handoff"] = 1 if row["requires_handoff"] else 0
         return row
 
     def _result_to_entries(self, result) -> list[dict[str, Any]]:
@@ -145,12 +167,27 @@ class KnowledgeSearchService:
         for entry in entries:
             fields = entry["fields"]
             fields["id"] = entry["id"]
-            if not fields.get("room_type_id"):
-                fields["room_type_id"] = None
+            fields["score"] = entry.get("similarity_score")
+            for key in (
+                "room_type",
+                "room_type_id",
+                "amenity_type",
+                "policy_type",
+                "faq_id",
+                "dialogue_id",
+                "section",
+                "doc_type",
+            ):
+                if not fields.get(key):
+                    fields[key] = None
+            fields["requires_handoff"] = bool(fields.get("requires_handoff", 0))
             cleaned_entries.append(fields)
         return cleaned_entries
 
     def _entity_type_for_intent(self, intent: Intent | None, query: str) -> str | None:
+        lowered_query = query.lower()
+        if "taxi" in lowered_query or "gps" in lowered_query or "direccion exacta" in lowered_query:
+            return None
         if intent == Intent.ROOM_SELECTION:
             return "room_type"
         if intent == Intent.POLICIES:
@@ -160,7 +197,6 @@ class KnowledgeSearchService:
         if intent == Intent.AVAILABILITY_PRICING:
             return "pricing"
         if intent == Intent.LOCATION_AND_PARKING:
-            lowered_query = query.lower()
             if any(
                 keyword in lowered_query
                 for keyword in ("parking", "aparc", "la mar", "station", "tren")
@@ -176,15 +212,21 @@ class KnowledgeSearchService:
 
     async def _run_search(
         self,
+        *,
         query: str,
         limit: int,
+        hotel_id: str | None,
         entity_type: str | None,
+        section: str | None,
+        doc_type: str | None,
         room_type_id: str | None,
         language: str | None,
         verification_state: str | None,
         source_priority: str | None,
         area_hint: int | None,
         price_hint: int | None,
+        policy_type: str | None,
+        amenity_type: str | None,
     ) -> list[dict[str, Any]]:
         query_params: dict[str, Any] = {
             "title_query": query,
@@ -192,17 +234,84 @@ class KnowledgeSearchService:
             "title_weight": 1.0,
             "body_weight": 1.2,
             "limit": limit,
+            "hotel_id": hotel_id,
             "entity_type": entity_type,
+            "section": section,
+            "doc_type": doc_type,
             "room_type_id": room_type_id,
             "language": language,
             "verification_state": verification_state,
             "source_priority": source_priority,
             "area_min": area_hint,
             "price_max": price_hint,
+            "policy_type": policy_type,
+            "amenity_type": amenity_type,
         }
 
         results = await self.app.async_query(knowledge_search_query, **query_params)
         return self._result_to_entries(results)
+
+    async def _search_across_doc_types(
+        self,
+        *,
+        query: str,
+        limit: int,
+        hotel_id: str | None,
+        entity_type: str | None,
+        section: str | None,
+        doc_types: list[str],
+        room_type_id: str | None,
+        language: str | None,
+        verification_state: str | None,
+        source_priority: str | None,
+        area_hint: int | None,
+        price_hint: int | None,
+        policy_type: str | None,
+        amenity_type: str | None,
+    ) -> list[dict[str, Any]]:
+        if not doc_types:
+            return await self._run_search(
+                query=query,
+                limit=limit,
+                hotel_id=hotel_id,
+                entity_type=entity_type,
+                section=section,
+                doc_type=None,
+                room_type_id=room_type_id,
+                language=language,
+                verification_state=verification_state,
+                source_priority=source_priority,
+                area_hint=area_hint,
+                price_hint=price_hint,
+                policy_type=policy_type,
+                amenity_type=amenity_type,
+            )
+
+        merged: dict[str, dict[str, Any]] = {}
+        for doc_type in doc_types:
+            results = await self._run_search(
+                query=query,
+                limit=limit,
+                hotel_id=hotel_id,
+                entity_type=entity_type,
+                section=section,
+                doc_type=doc_type,
+                room_type_id=room_type_id,
+                language=language,
+                verification_state=verification_state,
+                source_priority=source_priority,
+                area_hint=area_hint,
+                price_hint=price_hint,
+                policy_type=policy_type,
+                amenity_type=amenity_type,
+            )
+            for item in results:
+                merged.setdefault(item["id"], item)
+                if len(merged) >= limit:
+                    break
+            if len(merged) >= limit:
+                break
+        return list(merged.values())[:limit]
 
     def _build_guardrail_notes(
         self,
@@ -222,7 +331,6 @@ class KnowledgeSearchService:
             notes.append(
                 "Pide fechas exactas antes de cotizar. Sin motor de reservas integrado, solo comparte precios orientativos."
             )
-
         if any(
             result["verification_state"] == VerificationState.INTERNAL_UNVALIDATED.value
             for result in results
@@ -230,10 +338,6 @@ class KnowledgeSearchService:
             notes.append(
                 "Presenta cualquier precio interno como orientativo desde X EUR y recomienda confirmar en web o por contacto."
             )
-            logger.warning(
-                "Using internal_unvalidated pricing in hotel knowledge response"
-            )
-
         if any(
             result["verification_state"] == VerificationState.THIRD_PARTY.value
             for result in results
@@ -241,7 +345,10 @@ class KnowledgeSearchService:
             notes.append(
                 "Indica que esa tipologia proviene de canales externos y necesita confirmacion directa."
             )
-
+        if any(result.get("requires_handoff") for result in results):
+            notes.append(
+                "Hay contexto que requiere validacion humana. Si el dato es sensible o el cliente insiste, ofrece confirmar con el hotel."
+            )
         if not results:
             notes.append(
                 "Si no tienes el dato confirmado, dilo claramente y ofrece telefono o email del alojamiento."
@@ -254,68 +361,122 @@ class KnowledgeSearchService:
         limit: int = 3,
         intent: str | None = None,
         language: str | None = None,
+        hotel_id: str | None = None,
+        doc_types: list[str] | None = None,
+        section: str | None = None,
+        room_type_id: str | None = None,
+        policy_type: str | None = None,
+        amenity_type: str | None = None,
+        search_mode: str = "factual",
     ) -> dict[str, Any]:
         if self.bundle is None:
             self.ingest_default_bundle_if_configured()
         if self.bundle is None:
             raise RuntimeError("No hotel knowledge bundle has been ingested")
 
+        context = build_retrieval_context(
+            query,
+            explicit_intent=intent,
+            hotel_id=hotel_id,
+            search_mode=search_mode,
+            room_type_id=room_type_id,
+            policy_type=policy_type,
+            amenity_type=amenity_type,
+            section=section,
+            doc_types=doc_types,
+            language=language,
+        )
         resolved_intent = (
-            Intent(intent)
-            if intent in {item.value for item in Intent}
+            Intent(context.intent)
+            if context.intent in {item.value for item in Intent}
             else detect_intent(query)
         )
-        room_type_id = extract_room_type_id(query)
         area_hint = extract_area_sqm_hint(query)
         price_hint = extract_base_price_hint(query)
         entity_type = self._entity_type_for_intent(resolved_intent, query)
-        language_filter = self._resolve_language_filter(language)
+        language_filter = self._resolve_language_filter(context.filters.language)
 
-        results = await self._run_search(
+        results = await self._search_across_doc_types(
             query=query,
             limit=limit,
+            hotel_id=context.filters.hotel_id,
             entity_type=entity_type,
-            room_type_id=room_type_id,
+            section=context.filters.section,
+            doc_types=context.filters.doc_types,
+            room_type_id=context.filters.room_type_id,
             language=language_filter,
             verification_state=None,
             source_priority=None,
             area_hint=area_hint,
             price_hint=price_hint,
+            policy_type=context.filters.policy_type,
+            amenity_type=context.filters.amenity_type,
         )
 
-        if not results and room_type_id:
-            results = await self._run_search(
+        if not results and context.filters.room_type_id:
+            results = await self._search_across_doc_types(
                 query=query,
                 limit=limit,
+                hotel_id=context.filters.hotel_id,
                 entity_type=entity_type,
+                section=context.filters.section,
+                doc_types=context.filters.doc_types,
                 room_type_id=None,
                 language=language_filter,
                 verification_state=None,
                 source_priority=None,
                 area_hint=area_hint,
                 price_hint=price_hint,
+                policy_type=context.filters.policy_type,
+                amenity_type=context.filters.amenity_type,
             )
 
-        if not results and entity_type is not None:
-            results = await self._run_search(
+        if not results and context.filters.section is not None:
+            results = await self._search_across_doc_types(
                 query=query,
                 limit=limit,
-                entity_type=None,
-                room_type_id=room_type_id,
+                hotel_id=context.filters.hotel_id,
+                entity_type=entity_type,
+                section=None,
+                doc_types=context.filters.doc_types,
+                room_type_id=context.filters.room_type_id,
                 language=language_filter,
                 verification_state=None,
                 source_priority=None,
                 area_hint=area_hint,
                 price_hint=price_hint,
+                policy_type=context.filters.policy_type,
+                amenity_type=context.filters.amenity_type,
+            )
+
+        if not results and entity_type is not None:
+            results = await self._search_across_doc_types(
+                query=query,
+                limit=limit,
+                hotel_id=context.filters.hotel_id,
+                entity_type=None,
+                section=None,
+                doc_types=context.filters.doc_types,
+                room_type_id=context.filters.room_type_id,
+                language=language_filter,
+                verification_state=None,
+                source_priority=None,
+                area_hint=area_hint,
+                price_hint=price_hint,
+                policy_type=context.filters.policy_type,
+                amenity_type=context.filters.amenity_type,
             )
 
         guardrail_notes = self._build_guardrail_notes(query, resolved_intent, results)
 
         return {
             "query": query,
-            "resolved_intent": resolved_intent.value if resolved_intent else None,
-            "room_type_id": room_type_id,
+            "resolved_intent": resolved_intent.value if resolved_intent else context.intent,
+            "room_type_id": context.filters.room_type_id,
             "language_filter": language_filter,
+            "search_mode": search_mode,
+            "filters": context.filters.as_dict(),
+            "slot_hints": context.slot_hints,
             "result_count": len(results),
             "guardrail_notes": guardrail_notes,
             "fallback_contact": self.bundle.contact.model_dump(mode="json"),

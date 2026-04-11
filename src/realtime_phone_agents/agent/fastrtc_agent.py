@@ -1,5 +1,6 @@
 import inspect
 import re
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, List, Literal, Optional, Tuple
@@ -13,11 +14,17 @@ from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import InMemorySaver
 from loguru import logger
 
+from realtime_phone_agents.agent.prompts.builder import build_system_prompt
+from realtime_phone_agents.agent.prompts.defaults import (
+    DEFAULT_LANGUAGE_POLICY,
+    LOCAL_PROMPT_FALLBACKS,
+    LOCKED_LANGUAGE_POLICY,
+)
+from realtime_phone_agents.agent.retrieval import build_retrieval_context
 from realtime_phone_agents.agent.tools.property_search import search_hotel_kb_tool
 from realtime_phone_agents.agent.utils import model_has_tool_calls
 from realtime_phone_agents.config import settings
 from realtime_phone_agents.observability.opik_utils import build_langchain_callbacks
-from realtime_phone_agents.observability.prompt_versioning import Prompt
 from realtime_phone_agents.stt import get_stt_model
 from realtime_phone_agents.tts import get_tts_model
 from realtime_phone_agents.tts.base import TTSModel
@@ -27,51 +34,34 @@ from realtime_phone_agents.voice import get_ringback_effect, get_sound_effect
 AudioChunk = Tuple[int, np.ndarray]  # (sample_rate, samples)
 SelectedLanguage = Literal["english", "spanish"]
 
-COMMON_SYSTEM_PROMPT = """
-Your name is Blue Sardine Assistant, and you help guests of Blue Sardine Altea.
-Your role is to answer guest questions about rooms, services, policies, parking, location, and orientative pricing.
-You must use the search_hotel_kb_tool whenever you need factual hotel information.
-
-Trust and policy rules:
-Use only facts from the tool or from the user's input.
-Prefer official information over everything else.
-Treat internal_unvalidated pricing as orientative only.
-Treat third_party room type details as unconfirmed and say they require direct confirmation.
-If the tool says something is not confirmed, say so clearly and offer the phone or email contact.
-If the guest asks for pricing without exact stay dates, ask for exact dates first.
-If no booking engine is available, describe prices as orientative starting prices only.
-If a policy blocks a request, explain it briefly and offer a nearby alternative when possible.
-
-Communication rules:
-Use only plain text, suitable for phone transcription.
-Do not use emojis, asterisks, bullet points, or any special formatting.
-Keep answers concise, friendly, and easy to follow.
-Include exact operational details when needed, such as check-in times, prices, address, phone, or email.
-Do not invent amenities, prices, availability, or room details.
-Keep phone responses short, with one main idea per sentence.
-If an answer would be long, give a short answer first and ask whether the caller wants more detail.
-Write numbers, dates, times, prices, room counts, and phone numbers in a way that sounds natural when spoken aloud.
-
-When presenting multiple room options, separate them with simple sentences, maintaining clarity and brevity.
-""".strip()
-
-DEFAULT_SYSTEM_PROMPT = (
-    f"{COMMON_SYSTEM_PROMPT}\n"
-    "Reply in Spanish by default. If the guest speaks in English or explicitly asks for English, reply in English."
+DEFAULT_SYSTEM_PROMPT = "\n\n".join(
+    [
+        LOCAL_PROMPT_FALLBACKS["core"],
+        LOCAL_PROMPT_FALLBACKS["retrieval"],
+        LOCAL_PROMPT_FALLBACKS["escalation"],
+        LOCAL_PROMPT_FALLBACKS["style"],
+        DEFAULT_LANGUAGE_POLICY,
+    ]
+)
+ENGLISH_SYSTEM_PROMPT = "\n\n".join(
+    [DEFAULT_SYSTEM_PROMPT, LOCKED_LANGUAGE_POLICY["english"]]
+)
+SPANISH_SYSTEM_PROMPT = "\n\n".join(
+    [
+        "\n\n".join(
+            [
+                LOCAL_PROMPT_FALLBACKS["core"],
+                LOCAL_PROMPT_FALLBACKS["retrieval"],
+                LOCAL_PROMPT_FALLBACKS["escalation"],
+                LOCAL_PROMPT_FALLBACKS["style"],
+            ]
+        ),
+        LOCKED_LANGUAGE_POLICY["spanish"],
+    ]
 )
 
-ENGLISH_SYSTEM_PROMPT = (
-    f"{COMMON_SYSTEM_PROMPT}\n"
-    "The caller explicitly selected English at the start of the call. Reply only in English for the entire call."
-)
-
-SPANISH_SYSTEM_PROMPT = (
-    f"{COMMON_SYSTEM_PROMPT}\n"
-    "La persona que llama eligio espanol al inicio de la llamada. Responda solo en espanol durante toda la llamada."
-)
-
-ENGLISH_TOOL_USE_MESSAGE = "I am checking the hotel information."
-SPANISH_TOOL_USE_MESSAGE = "Estoy revisando la informacion del hotel."
+ENGLISH_TOOL_USE_MESSAGE = "One moment."
+SPANISH_TOOL_USE_MESSAGE = "Un momento."
 ENGLISH_FALLBACK_MESSAGE = "I do not have that confirmed right now. You can confirm it directly with the hotel by phone or email."
 SPANISH_FALLBACK_MESSAGE = "No tengo ese dato confirmado ahora mismo. Puedes confirmarlo con el alojamiento por telefono o email."
 
@@ -93,9 +83,6 @@ SPANISH_SELECTION_FALLBACK = "No he podido confirmar el idioma. Continuare en es
 
 ENGLISH_SELECTION_KEYWORDS = ("english", "ingles")
 SPANISH_SELECTION_KEYWORDS = ("espanol", "spanish", "castellano")
-DEFAULT_PROMPT_NAME = "blue_sardine_assistant.default"
-ENGLISH_PROMPT_NAME = "blue_sardine_assistant.english_locked"
-SPANISH_PROMPT_NAME = "blue_sardine_assistant.spanish_locked"
 _SENTENCE_SPLIT = re.compile(r"(?<=[\.\!\?])\s+")
 
 
@@ -190,6 +177,8 @@ class CallSessionState:
     tool_use_message: str = SPANISH_TOOL_USE_MESSAGE
     fallback_message: str = SPANISH_FALLBACK_MESSAGE
     last_final_text: Optional[str] = None
+    last_detected_intent: Optional[str] = None
+    last_retrieval_metadata: dict[str, Any] = field(default_factory=dict)
     prompt_played: bool = False
 
 
@@ -233,25 +222,21 @@ class FastRTCAgent:
         self._react_agent = self._create_react_agent(
             system_prompt=system_prompt,
             tools=tools,
-            prompt_name=DEFAULT_PROMPT_NAME,
+            language_lock=None,
         )
         self._english_react_agent = None
         self._spanish_react_agent = None
         self._spanish_tts_model = None
         if self._language_selection_enabled or self._language_locked is not None:
             self._english_react_agent = self._create_react_agent(
-                system_prompt=self._build_locked_system_prompt(
-                    "english", system_prompt
-                ),
+                system_prompt=system_prompt,
                 tools=tools,
-                prompt_name=ENGLISH_PROMPT_NAME,
+                language_lock="english",
             )
             self._spanish_react_agent = self._create_react_agent(
-                system_prompt=self._build_locked_system_prompt(
-                    "spanish", system_prompt
-                ),
+                system_prompt=system_prompt,
                 tools=tools,
-                prompt_name=SPANISH_PROMPT_NAME,
+                language_lock="spanish",
             )
             if spanish_tts_model is not None:
                 self._spanish_tts_model = spanish_tts_model
@@ -263,21 +248,6 @@ class FastRTCAgent:
         self._tool_use_message = tool_use_message
         self._sound_effect_seconds = sound_effect_seconds
         self._stream = self._build_stream()
-
-    def _build_locked_system_prompt(
-        self, language: SelectedLanguage, custom_system_prompt: str | None
-    ) -> str:
-        if custom_system_prompt:
-            if language == "english":
-                return (
-                    f"{custom_system_prompt}\n"
-                    "Language lock: the caller explicitly selected English. Reply only in English for the entire call."
-                )
-            return (
-                f"{custom_system_prompt}\n"
-                "Bloqueo de idioma: la persona que llama eligio espanol. Responda solo en espanol durante toda la llamada."
-            )
-        return ENGLISH_SYSTEM_PROMPT if language == "english" else SPANISH_SYSTEM_PROMPT
 
     def _build_spanish_tts_model(self) -> OrpheusTTSModel:
         options = OrpheusTTSOptions(
@@ -297,24 +267,27 @@ class FastRTCAgent:
         self,
         system_prompt: str | None = None,
         tools: List | None = None,
-        prompt_name: str = DEFAULT_PROMPT_NAME,
+        language_lock: SelectedLanguage | None = None,
     ):
         llm = ChatGroq(
             model=settings.groq.model,
             api_key=settings.groq.api_key,
         )
-        prompt = Prompt(
-            name=prompt_name,
-            prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
-            tags=["voice-agent", "hotel"],
-        )
+        if system_prompt is not None:
+            prompt_text = system_prompt
+            prompt_telemetry = {"prompt.inline.source": "custom"}
+        else:
+            built_prompt = build_system_prompt(language_lock=language_lock)
+            prompt_text = built_prompt.text
+            prompt_telemetry = built_prompt.telemetry
 
         agent = create_agent(
             llm,
             checkpointer=InMemorySaver(),
-            system_prompt=prompt.text,
+            system_prompt=prompt_text,
             tools=tools or [search_hotel_kb_tool],
         )
+        setattr(agent, "_prompt_telemetry", prompt_telemetry)
         return agent
 
     def _build_stream(self) -> Stream:
@@ -473,14 +446,27 @@ class FastRTCAgent:
         transcription: str,
     ) -> AsyncIterator[Optional[AudioChunk]]:
         final_text: str | None = None
+        lookup_preamble_emitted = False
+        lookup_sound_emitted = False
+        start_time = time.perf_counter()
         session.last_final_text = None
         react_agent = session.react_agent or self._react_agent
+        retrieval_context = build_retrieval_context(
+            transcription,
+            language="en-US" if session.language == "english" else None,
+        )
+        session.last_detected_intent = retrieval_context.intent
+        session.last_retrieval_metadata = retrieval_context.as_metadata()
         metadata = {
             "call_id": session.call_id,
             "thread_id": session.thread_id,
             "language": session.language or "auto",
         }
+        metadata.update(session.last_retrieval_metadata)
+        metadata.update(self._get_prompt_metadata(react_agent))
         tags = ["voice-agent", f"language:{session.language or 'auto'}"]
+        if retrieval_context.intent:
+            tags.append(f"intent:{retrieval_context.intent}")
         callbacks = build_langchain_callbacks(
             thread_id=session.thread_id,
             tags=tags,
@@ -501,12 +487,27 @@ class FastRTCAgent:
         ):
             for step, data in chunk.items():
                 if step == "model" and model_has_tool_calls(data):
-                    async for audio_chunk in self._synthesize_speech(
-                        session, session.tool_use_message
+                    elapsed_seconds = time.perf_counter() - start_time
+                    if (
+                        not lookup_preamble_emitted
+                        and self._should_emit_lookup_preamble(
+                            session, retrieval_context, elapsed_seconds
+                        )
                     ):
-                        yield audio_chunk
+                        lookup_preamble_emitted = True
+                        async for audio_chunk in self._synthesize_speech(
+                            session, session.tool_use_message
+                        ):
+                            yield audio_chunk
 
-                    if self._sound_effect_seconds > 0:
+                    if (
+                        not lookup_sound_emitted
+                        and self._sound_effect_seconds > 0
+                        and self._should_emit_lookup_sound(
+                            retrieval_context, elapsed_seconds
+                        )
+                    ):
+                        lookup_sound_emitted = True
                         async for effect_chunk in self._play_sound_effect():
                             yield effect_chunk
 
@@ -514,6 +515,47 @@ class FastRTCAgent:
                     final_text = self._extract_final_text(data)
 
         session.last_final_text = final_text
+
+    def _get_prompt_metadata(self, react_agent: Any) -> dict[str, Any]:
+        prompt_metadata = getattr(react_agent, "_prompt_telemetry", {})
+        return dict(prompt_metadata) if isinstance(prompt_metadata, dict) else {}
+
+    def _should_emit_lookup_preamble(
+        self,
+        session: CallSessionState,
+        retrieval_context,
+        elapsed_seconds: float,
+    ) -> bool:
+        mode = settings.call_flow.tool_use_preamble_mode
+        if mode == "always":
+            return True
+        if mode == "never":
+            return False
+        if elapsed_seconds >= settings.call_flow.lookup_latency_threshold_ms / 1000:
+            return True
+        if retrieval_context.search_mode != "factual":
+            return True
+        if retrieval_context.intent in {"availability_pricing", "special_requests"}:
+            return True
+        if retrieval_context.filters.policy_type in {"payment", "cancellation"}:
+            return True
+        return len(retrieval_context.query.split()) > 14
+
+    def _should_emit_lookup_sound(
+        self,
+        retrieval_context,
+        elapsed_seconds: float,
+    ) -> bool:
+        mode = settings.call_flow.lookup_sound_mode
+        if mode == "always":
+            return True
+        if mode == "never":
+            return False
+        if elapsed_seconds >= settings.call_flow.lookup_latency_threshold_ms / 1000:
+            return True
+        if retrieval_context.search_mode in {"handoff", "style"}:
+            return True
+        return len(retrieval_context.query.split()) > 18
 
     def _extract_final_text(self, model_step_data) -> Optional[str]:
         msgs = model_step_data.get("messages", [])

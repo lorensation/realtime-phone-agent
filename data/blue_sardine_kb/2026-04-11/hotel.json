@@ -1,0 +1,97 @@
+{
+  "kb_version": "2026-04-11",
+  "source": {
+    "primary_domain": "bluesardinealtea.com",
+    "retrieved_local_date": "2026-04-11",
+    "notes": "Datos extraidos del sitio oficial, condiciones generales y reporte de investigacion del hotel. El pricing sigue siendo input interno orientativo."
+  },
+  "property": {
+    "name": "Blue Sardine Altea",
+    "category": "hostal_boutique",
+    "city": "Altea",
+    "region": "Alicante",
+    "country": "ES",
+    "address_public": "Calle Pescadores 1, 03590, Altea, Alicante",
+    "contact": {
+      "phone": "+34 629 610 233",
+      "email": "info@bluesardinealtea.com"
+    },
+    "positioning": {
+      "summary": "Alojamiento boutique en un antiguo barrio de pescadores, cerca del mar y del casco historico.",
+      "themes": [
+        "innovacion",
+        "diseno",
+        "sostenibilidad",
+        "limpieza",
+        "hospitalidad",
+        "localizacion"
+      ]
+    }
+  },
+  "policies": {
+    "check_in": "15:00",
+    "check_out": "12:00",
+    "luggage_storage": {
+      "lockers_free": true,
+      "key_drop_mailbox": true
+    },
+    "adults_and_children": {
+      "adults_only": true,
+      "children_allowed_from_age": 10
+    },
+    "smoke_free": true,
+    "pets_allowed": false,
+    "bicycles_and_scooters_allowed_inside": false,
+    "damages_fees_eur": {
+      "towel_small": 10,
+      "towel_large": 15,
+      "decor_items": "according_to_value"
+    },
+    "reservation_hours": {
+      "phone_support": "Mon-Sun 10:00-17:00",
+      "website_booking": "24/7"
+    },
+    "payment_and_cancellation": {
+      "card_required": true,
+      "payment_deadline_days_before_arrival": 5,
+      "free_cancellation_until_days_before_arrival": 5,
+      "date_changes_allowed_within_days_before_arrival": false,
+      "non_refundable": {
+        "cancellation_allowed": false,
+        "date_modification_allowed": false
+      },
+      "force_majeure": "case_by_case_review"
+    }
+  },
+  "parking": {
+    "available_on_site": false,
+    "public_free_parking": {
+      "available": true,
+      "walking_distance_m": 200,
+      "location_note": "Calle La Mar 98, detras de la estacion de tren",
+      "liability_note": "No responsable de robos o danos en el parking"
+    }
+  },
+  "services_and_facilities": {
+    "experience": [
+      "atencion_personalizada",
+      "tecnologia_para_aperturas_y_registros",
+      "informacion_turistica",
+      "celebracion_cumpleanos_aniversarios"
+    ],
+    "housekeeping": [
+      "servicio_de_limpieza",
+      "amenities",
+      "toallas",
+      "sabanas_y_almohadas_confortables"
+    ],
+    "in_room_and_property": [
+      "wifi_gratuito",
+      "climatizacion_frio_calor",
+      "caja_fuerte",
+      "nevera_o_minibar",
+      "smart_tv_en_todas_las_habitaciones",
+      "taquillas_y_almacenamiento_equipaje"
+    ]
+  }
+}
