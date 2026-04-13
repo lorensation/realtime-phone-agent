@@ -28,7 +28,6 @@ from realtime_phone_agents.observability.opik_utils import build_langchain_callb
 from realtime_phone_agents.stt import get_stt_model
 from realtime_phone_agents.tts import get_tts_model
 from realtime_phone_agents.tts.base import TTSModel
-from realtime_phone_agents.tts.runpod import OrpheusTTSModel, OrpheusTTSOptions
 from realtime_phone_agents.voice import get_ringback_effect, get_sound_effect
 
 AudioChunk = Tuple[int, np.ndarray]  # (sample_rate, samples)
@@ -74,9 +73,7 @@ INITIAL_LANGUAGE_PROMPT_ES = (
     "Si desea continuar en espanol, diga espanol."
 )
 RETRY_LANGUAGE_PROMPT_EN = "Sorry, I did not catch that. Please say English."
-RETRY_LANGUAGE_PROMPT_ES = (
-    "Lo siento, no lo he entendido. Por favor, diga espanol."
-)
+RETRY_LANGUAGE_PROMPT_ES = "Lo siento, no lo he entendido. Por favor, diga espanol."
 ENGLISH_GREETING = "Thank you. I will assist you in English. How can I help you today?"
 SPANISH_GREETING = "Gracias. Le atendere en espanol. En que puedo ayudarle hoy?"
 SPANISH_SELECTION_FALLBACK = "No he podido confirmar el idioma. Continuare en espanol. En que puedo ayudarle hoy?"
@@ -133,7 +130,9 @@ def chunk_text(text: str, max_chars: int = 240) -> list[str]:
 
             oversized_chunk = ""
             for word in sentence.split():
-                candidate = f"{oversized_chunk} {word}".strip() if oversized_chunk else word
+                candidate = (
+                    f"{oversized_chunk} {word}".strip() if oversized_chunk else word
+                )
                 if len(candidate) <= max_chars:
                     oversized_chunk = candidate
                     continue
@@ -204,10 +203,13 @@ class FastRTCAgent:
         language_locked: SelectedLanguage | None = None,
         can_interrupt: bool = True,
     ):
-        self._stt_model = stt_model or get_stt_model(settings.stt_model)
-        self._tts_model = tts_model or get_tts_model(settings.tts_model)
-        self._voice_effect = voice_effect or get_sound_effect()
         self._language_locked = language_locked
+        self._stt_model = stt_model or get_stt_model(settings.stt_model)
+        self._tts_model = tts_model or get_tts_model(
+            settings.tts_model,
+            language=self._language_code(language_locked),
+        )
+        self._voice_effect = voice_effect or get_sound_effect()
         self._language_selection_enabled = (
             settings.call_flow.language_selection_enabled
             and self._language_locked is None
@@ -226,6 +228,7 @@ class FastRTCAgent:
         )
         self._english_react_agent = None
         self._spanish_react_agent = None
+        self._english_tts_model = None
         self._spanish_tts_model = None
         if self._language_selection_enabled or self._language_locked is not None:
             self._english_react_agent = self._create_react_agent(
@@ -238,10 +241,15 @@ class FastRTCAgent:
                 tools=tools,
                 language_lock="spanish",
             )
+            self._english_tts_model = (
+                self._tts_model
+                if tts_model is not None
+                else self._build_language_tts_model("english")
+            )
             if spanish_tts_model is not None:
                 self._spanish_tts_model = spanish_tts_model
             elif self._language_selection_enabled or self._language_locked == "spanish":
-                self._spanish_tts_model = self._build_spanish_tts_model()
+                self._spanish_tts_model = self._build_language_tts_model("spanish")
 
         self._thread_id = thread_id
         self._fallback_message = fallback_message
@@ -249,19 +257,25 @@ class FastRTCAgent:
         self._sound_effect_seconds = sound_effect_seconds
         self._stream = self._build_stream()
 
-    def _build_spanish_tts_model(self) -> OrpheusTTSModel:
-        options = OrpheusTTSOptions(
-            api_url=settings.orpheus_spanish.api_url,
-            model=settings.orpheus_spanish.model,
-            voice=settings.orpheus_spanish.voice,
-            temperature=settings.orpheus_spanish.temperature,
-            top_p=settings.orpheus_spanish.top_p,
-            max_tokens=settings.orpheus_spanish.max_tokens,
-            repetition_penalty=settings.orpheus_spanish.repetition_penalty,
-            sample_rate=settings.orpheus_spanish.sample_rate,
-            debug=settings.orpheus_spanish.debug,
+    def _language_code(self, language: SelectedLanguage | None) -> str | None:
+        if language == "english":
+            return "en-US"
+        if language == "spanish":
+            return "es-ES"
+        return None
+
+    def _stt_language_hint(self, language: SelectedLanguage | None) -> str | None:
+        if language == "english":
+            return "en"
+        if language == "spanish":
+            return "es"
+        return None
+
+    def _build_language_tts_model(self, language: SelectedLanguage) -> TTSModel:
+        return get_tts_model(
+            settings.tts_model,
+            language=self._language_code(language),
         )
-        return OrpheusTTSModel(options)
 
     def _create_react_agent(
         self,
@@ -342,7 +356,7 @@ class FastRTCAgent:
         session.failed_selection_attempts = 0
         if language == "english":
             session.react_agent = self._english_react_agent or self._react_agent
-            session.tts_model = self._tts_model
+            session.tts_model = self._english_tts_model or self._tts_model
             session.tool_use_message = ENGLISH_TOOL_USE_MESSAGE
             session.fallback_message = ENGLISH_FALLBACK_MESSAGE
             return
@@ -368,7 +382,7 @@ class FastRTCAgent:
         audio: AudioChunk,
     ) -> AsyncIterator[AudioChunk]:
         session = self._get_session()
-        transcription = await self._transcribe(audio)
+        transcription = await self._transcribe(audio, language=session.language)
         logger.info(f"Transcription: {transcription}")
 
         if self._language_selection_enabled and not session.language_selection_complete:
@@ -393,8 +407,16 @@ class FastRTCAgent:
             async for audio_chunk in self._synthesize_speech(session, final_response):
                 yield audio_chunk
 
-    async def _transcribe(self, audio: AudioChunk) -> str:
-        return self._stt_model.stt(audio)
+    async def _transcribe(
+        self,
+        audio: AudioChunk,
+        *,
+        language: SelectedLanguage | None = None,
+    ) -> str:
+        stt_kwargs: dict[str, str] = {}
+        if language_hint := self._stt_language_hint(language):
+            stt_kwargs["language"] = language_hint
+        return self._stt_model.stt(audio, **stt_kwargs)
 
     async def _handle_language_selection(
         self,

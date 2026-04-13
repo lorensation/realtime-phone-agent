@@ -19,6 +19,7 @@ from realtime_phone_agents.agent.fastrtc_agent import (
 from realtime_phone_agents.api.routes.voice import (
     _build_connect_twiml,
     _build_language_gather_twiml,
+    _remove_internal_telephone_routes,
     _replace_telephone_incoming_route,
     _replace_telephone_language_route,
 )
@@ -29,6 +30,7 @@ from realtime_phone_agents.stt.runpod.faster_whisper.options import (
     FasterWhisperSTTOptions,
 )
 from realtime_phone_agents.tts.elevenlabs.model import ElevenLabsTTSModel
+from realtime_phone_agents.tts.mistral.model import MistralVoxtralTTSModel
 from realtime_phone_agents.stt.utils import get_stt_model
 from realtime_phone_agents.tts.runpod.orpheus.model import OrpheusTTSModel
 from realtime_phone_agents.tts.runpod.orpheus.options import OrpheusTTSOptions
@@ -78,6 +80,7 @@ class OpikDecoratorTests(unittest.TestCase):
         import realtime_phone_agents.observability.opik_utils as opik_utils
 
         with patch.object(opik_utils, "opik", None):
+
             @opik_utils.track(name="noop")
             def decorated():
                 return "ok"
@@ -90,7 +93,7 @@ class SettingsParsingTests(unittest.TestCase):
         settings = Settings(
             _env_file=None,
             stt_model="moonshine",
-            tts_model="kokoro",
+            tts_model="mistral-voxtral",
             faster_whisper={
                 "api_url": "https://faster-whisper.example",
                 "model": "Systran/faster-whisper-large-v3",
@@ -108,15 +111,29 @@ class SettingsParsingTests(unittest.TestCase):
                 "voice_id_es": "voice-es",
                 "output_format": "pcm_16000",
             },
+            mistral={
+                "api_key": "mistral-key",
+                "voice_id": "voice-all",
+                "voice_id_en": "voice-en",
+                "voice_id_es": "voice-es",
+            },
             opik={
                 "api_key": "opik-key",
                 "project_name": "blue-sardine-hotel",
             },
             runpod={
                 "api_key": "runpod-key",
+                "call_center_image_name": "hotel-agent:latest",
+                "call_center_instance_id": "cpu-test",
                 "orpheus_gpu_type": "GPU-A",
                 "orpheus_image_name": "orpheus-image",
             },
+            twilio={
+                "account_sid": "sid",
+                "auth_token": "token",
+                "from_number": "+34123456789",
+            },
+            server={"public_base_url": "https://hotel.example"},
             call_flow={
                 "language_selection_enabled": True,
                 "selection_retry_limit": 3,
@@ -129,7 +146,7 @@ class SettingsParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.stt_model, "moonshine")
-        self.assertEqual(settings.tts_model, "kokoro")
+        self.assertEqual(settings.tts_model, "mistral-voxtral")
         self.assertEqual(
             settings.faster_whisper.api_url, "https://faster-whisper.example"
         )
@@ -141,9 +158,15 @@ class SettingsParsingTests(unittest.TestCase):
         self.assertEqual(settings.together.api_key, "together-key")
         self.assertEqual(settings.elevenlabs.api_key, "eleven-key")
         self.assertEqual(settings.elevenlabs.output_format, "pcm_16000")
+        self.assertEqual(settings.mistral.api_key, "mistral-key")
+        self.assertEqual(settings.mistral.voice_id_es, "voice-es")
         self.assertEqual(settings.opik.project_name, "blue-sardine-hotel")
+        self.assertEqual(settings.runpod.call_center_image_name, "hotel-agent:latest")
+        self.assertEqual(settings.runpod.call_center_instance_id, "cpu-test")
         self.assertEqual(settings.runpod.orpheus_gpu_type, "GPU-A")
         self.assertEqual(settings.runpod.orpheus_image_name, "orpheus-image")
+        self.assertEqual(settings.twilio.account_sid, "sid")
+        self.assertEqual(settings.server.public_base_url, "https://hotel.example")
         self.assertTrue(settings.call_flow.language_selection_enabled)
         self.assertEqual(settings.call_flow.selection_retry_limit, 3)
 
@@ -176,6 +199,15 @@ class TTSFactoryTests(unittest.TestCase):
             "realtime_phone_agents.tts.utils.KokoroTTSModel", return_value="kokoro"
         ):
             self.assertEqual(get_tts_model("kokoro"), "kokoro")
+
+        with patch(
+            "realtime_phone_agents.tts.utils.MistralVoxtralTTSModel",
+            return_value="mistral",
+        ) as mistral_factory:
+            self.assertEqual(
+                get_tts_model("mistral-voxtral", language="es-ES"), "mistral"
+            )
+            mistral_factory.assert_called_once_with(language="es-ES")
 
         orpheus_instance = MagicMock()
         with patch(
@@ -440,11 +472,75 @@ class ElevenLabsTTSModelTests(unittest.TestCase):
         self.assertEqual(FakeClient.last_request[3], {"output_format": "pcm_16000"})
         self.assertEqual(FakeClient.last_request[4]["model_id"], "eleven_flash_v2_5")
         self.assertEqual(FakeClient.last_request[4]["language_code"], "es")
-        self.assertEqual(
-            FakeClient.last_request[4]["apply_text_normalization"], "auto"
-        )
+        self.assertEqual(FakeClient.last_request[4]["apply_text_normalization"], "auto")
         self.assertEqual(FakeClient.last_request[4]["previous_text"], "bienvenido")
         self.assertEqual(FakeClient.last_request[4]["next_text"], "gracias")
+
+
+class MistralTTSModelTests(unittest.TestCase):
+    def test_mistral_streams_pcm_sse_audio(self):
+        import realtime_phone_agents.tts.mistral.model as mistral_model
+
+        float_audio = np.array([0.25, -0.25], dtype=np.float32).tobytes()
+        encoded_audio = base64.b64encode(float_audio).decode("utf-8")
+
+        class FakeResponse:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            def raise_for_status(self):
+                return None
+
+            async def aiter_lines(self):
+                for line in (
+                    f'data: {{"audio_data":"{encoded_audio}"}}',
+                    "",
+                    "data: [DONE]",
+                    "",
+                ):
+                    yield line
+
+        class FakeClient:
+            last_request = None
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            def stream(self, method, url, headers=None, json=None):
+                FakeClient.last_request = (method, url, headers, json)
+                return FakeResponse()
+
+        with patch.object(mistral_model.httpx, "AsyncClient", FakeClient):
+            model = MistralVoxtralTTSModel(
+                mistral_model.MistralTTSOptions(
+                    api_key="mistral-key",
+                    base_url="https://api.mistral.example/v1",
+                    tts_model="voxtral-tts-2603",
+                    voice_id="voice-all",
+                    voice_id_es="voice-es",
+                    response_format="pcm",
+                    sample_rate_hz=24000,
+                ),
+                language="es-ES",
+            )
+            chunks = asyncio.run(collect_audio(model.stream_tts("hola")))
+
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0][0], 24000)
+        self.assertEqual(
+            FakeClient.last_request[1], "https://api.mistral.example/v1/audio/speech"
+        )
+        self.assertEqual(FakeClient.last_request[3]["voice_id"], "voice-es")
+        self.assertEqual(FakeClient.last_request[3]["stream"], True)
 
 
 class OrpheusTTSModelTests(unittest.TestCase):
@@ -612,9 +708,7 @@ class ChunkingTests(unittest.TestCase):
         self.assertEqual(len(chunks), 2)
         self.assertEqual(" ".join(call[0] for call in model.calls), text)
         self.assertEqual(model.calls[0][1]["next_text"], model.calls[1][0])
-        self.assertEqual(
-            model.calls[1][1]["previous_text"], model.calls[0][0]
-        )
+        self.assertEqual(model.calls[1][1]["previous_text"], model.calls[0][0])
 
 
 class LanguageSelectionTests(unittest.TestCase):
@@ -845,9 +939,19 @@ class LanguageSelectionTests(unittest.TestCase):
         self.assertIs(session.tts_model, english_tts)
         self.assertEqual(session.react_agent, "default-agent")
 
-    def test_missing_spanish_api_url_fails_fast_when_feature_enabled(self):
+    def test_missing_primary_language_tts_config_fails_fast_when_feature_enabled(self):
         fake_settings = self._build_fake_settings(enabled=True)
-        fake_settings.orpheus_spanish.api_url = ""
+        fake_settings.tts_model = "mistral-voxtral"
+        fake_settings.mistral = SimpleNamespace(
+            api_key="mistral-key",
+            base_url="https://api.mistral.example/v1",
+            tts_model="voxtral-tts-2603",
+            voice_id="",
+            voice_id_en="",
+            voice_id_es="",
+            response_format="pcm",
+            sample_rate_hz=24000,
+        )
 
         with (
             patch.object(agent_module, "settings", fake_settings),
@@ -920,7 +1024,9 @@ class FastRTCAgentSmokeTests(unittest.TestCase):
         self.assertIs(agent.tts_model, fake_tts)
         self.assertIs(agent.react_agent, fake_react_agent)
         self.assertIs(agent.stream, fake_stream)
-        self.assertIn("phone receptionist for Blue Sardine Altea", DEFAULT_SYSTEM_PROMPT)
+        self.assertIn(
+            "phone receptionist for Blue Sardine Altea", DEFAULT_SYSTEM_PROMPT
+        )
 
 
 class LookupCuePolicyTests(unittest.TestCase):
@@ -1072,7 +1178,7 @@ class VoiceRouteTests(unittest.TestCase):
             language="es-ES",
         )
 
-        self.assertIn('wss://demo.example.com/voice-es/telephone/handler', twiml)
+        self.assertIn("wss://demo.example.com/voice-es/telephone/handler", twiml)
         self.assertIn("<Say", twiml)
 
     def test_replace_telephone_incoming_route_replaces_existing_mount_route(self):
@@ -1094,6 +1200,21 @@ class VoiceRouteTests(unittest.TestCase):
         self.assertEqual(len(matching_routes), 1)
         self.assertEqual(matching_routes[0].methods, {"GET", "POST"})
 
+    def test_remove_internal_telephone_routes_keeps_only_public_entrypoint(self):
+        app = FastAPI()
+        app.add_api_route(
+            "/voice-en/telephone/incoming", lambda: None, methods=["POST"]
+        )
+        app.add_api_route(
+            "/voice-es/telephone/incoming", lambda: None, methods=["POST"]
+        )
+
+        _remove_internal_telephone_routes(app)
+
+        remaining_paths = {getattr(route, "path", None) for route in app.router.routes}
+        self.assertNotIn("/voice-en/telephone/incoming", remaining_paths)
+        self.assertNotIn("/voice-es/telephone/incoming", remaining_paths)
+
     def test_language_route_connects_to_spanish_and_english_handlers(self):
         app = FastAPI()
         _replace_telephone_language_route(app)
@@ -1102,21 +1223,27 @@ class VoiceRouteTests(unittest.TestCase):
         spanish = client.post(
             "/voice/telephone/language?retry=0",
             data={"Digits": "1"},
-            headers={"x-forwarded-host": "demo.example.com", "x-forwarded-proto": "https"},
+            headers={
+                "x-forwarded-host": "demo.example.com",
+                "x-forwarded-proto": "https",
+            },
         )
         english = client.post(
             "/voice/telephone/language?retry=0",
             data={"Digits": "2"},
-            headers={"x-forwarded-host": "demo.example.com", "x-forwarded-proto": "https"},
+            headers={
+                "x-forwarded-host": "demo.example.com",
+                "x-forwarded-proto": "https",
+            },
         )
 
         self.assertEqual(spanish.status_code, 200)
         self.assertIn(
-            'wss://demo.example.com/voice-es/telephone/handler',
+            "wss://demo.example.com/voice-es/telephone/handler",
             spanish.text,
         )
         self.assertIn(
-            'wss://demo.example.com/voice-en/telephone/handler',
+            "wss://demo.example.com/voice-en/telephone/handler",
             english.text,
         )
 
@@ -1128,15 +1255,54 @@ class VoiceRouteTests(unittest.TestCase):
         response = client.post(
             "/voice/telephone/language?retry=2",
             data={"SpeechResult": "no entiendo"},
-            headers={"x-forwarded-host": "demo.example.com", "x-forwarded-proto": "https"},
+            headers={
+                "x-forwarded-host": "demo.example.com",
+                "x-forwarded-proto": "https",
+            },
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertIn(
-            'wss://demo.example.com/voice-es/telephone/handler',
+            "wss://demo.example.com/voice-es/telephone/handler",
             response.text,
         )
         self.assertIn("Continuare en espanol", response.text)
+
+    def test_public_base_url_override_is_used_for_twiml(self):
+        request = FastAPIRequest(
+            {
+                "type": "http",
+                "method": "POST",
+                "scheme": "http",
+                "path": "/voice/telephone/incoming",
+                "headers": [
+                    (b"host", b"localhost:8000"),
+                    (b"x-forwarded-host", b"ignored.example.com"),
+                    (b"x-forwarded-proto", b"http"),
+                ],
+                "query_string": b"",
+                "server": ("localhost", 8000),
+                "client": ("127.0.0.1", 12345),
+                "http_version": "1.1",
+            }
+        )
+
+        with patch(
+            "realtime_phone_agents.api.routes.voice.settings",
+            SimpleNamespace(
+                server=SimpleNamespace(public_base_url="https://hotel.example"),
+                call_flow=SimpleNamespace(selection_retry_limit=2),
+                tts_model="mistral-voxtral",
+            ),
+        ):
+            twiml = _build_connect_twiml(
+                request,
+                voice_path="/voice-en",
+                greeting="Hello",
+                language="en-US",
+            )
+
+        self.assertIn("wss://hotel.example/voice-en/telephone/handler", twiml)
 
 
 class RunPodLauncherTests(unittest.TestCase):

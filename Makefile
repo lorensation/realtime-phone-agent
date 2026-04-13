@@ -5,6 +5,7 @@ endif
 include .env
 
 CHECK_DIRS := src/
+DOCKER_IMAGE ?= $(RUNPOD__CALL_CENTER_IMAGE_NAME)
 
 # --- Ruff ---
 
@@ -23,7 +24,27 @@ format-check:
 lint-check:
 	uv run ruff check $(CHECK_DIRS)
 
-# --- RunPod ---
+# --- Deployment ---
+
+validate-deploy-env:
+	uv run python scripts/validate_deployment_env.py
+
+build-call-center-image:
+	docker build -t $(DOCKER_IMAGE) .
+
+push-call-center-image:
+	docker push $(DOCKER_IMAGE)
+
+create-call-center-pod:
+	uv run python scripts/runpod/create_call_center_pod.py
+
+ingest-hotel-kb:
+	uv run python scripts/ingest_hotel_kb.py
+
+outbound-call:
+	uv run python scripts/make_outbound_call.py
+
+# --- RunPod Legacy ---
 
 create-faster-whisper-pod:
 	uv run python scripts/runpod/create_faster_whisper_pod.py

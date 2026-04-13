@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from uuid import uuid4
 
 from fastapi import FastAPI, Request, Response
@@ -27,13 +27,24 @@ def _header_value(request: Request, header_name: str, fallback: str) -> str:
     return value.split(",")[0].strip()
 
 
+def _configured_public_base_url() -> str | None:
+    base_url = settings.server.public_base_url.strip()
+    if not base_url:
+        return None
+    return base_url.rstrip("/")
+
+
 def _public_host(request: Request) -> str:
+    if configured_base_url := _configured_public_base_url():
+        return urlsplit(configured_base_url).netloc
     return _header_value(
         request, "x-forwarded-host", request.headers.get("host", "localhost")
     )
 
 
 def _public_scheme(request: Request) -> str:
+    if configured_base_url := _configured_public_base_url():
+        return urlsplit(configured_base_url).scheme or request.url.scheme
     return _header_value(request, "x-forwarded-proto", request.url.scheme)
 
 
@@ -126,8 +137,18 @@ def _build_connect_twiml(
 
 def _remove_route_if_present(app: FastAPI, route_path: str) -> None:
     app.router.routes[:] = [
-        route for route in app.router.routes if getattr(route, "path", None) != route_path
+        route
+        for route in app.router.routes
+        if getattr(route, "path", None) != route_path
     ]
+
+
+def _remove_internal_telephone_routes(app: FastAPI) -> None:
+    for route_path in (
+        "/voice-en/telephone/incoming",
+        "/voice-es/telephone/incoming",
+    ):
+        _remove_route_if_present(app, route_path)
 
 
 def _replace_telephone_incoming_route(app: FastAPI) -> None:
@@ -220,13 +241,13 @@ def mount_voice_stream(app: FastAPI):
         )
         english_agent = FastRTCAgent(
             thread_id=str(uuid4()),
+            tts_model=get_tts_model(settings.tts_model, language="en-US"),
             language_locked="english",
             can_interrupt=True,
         )
-        spanish_tts_model = get_tts_model("elevenlabs-es")
         spanish_agent = FastRTCAgent(
             thread_id=str(uuid4()),
-            spanish_tts_model=spanish_tts_model,
+            tts_model=get_tts_model(settings.tts_model, language="es-ES"),
             language_locked="spanish",
             can_interrupt=True,
         )
@@ -234,6 +255,7 @@ def mount_voice_stream(app: FastAPI):
         generic_agent.stream.mount(app, path="/voice")
         english_agent.stream.mount(app, path="/voice-en")
         spanish_agent.stream.mount(app, path="/voice-es")
+        _remove_internal_telephone_routes(app)
         _replace_telephone_incoming_route(app)
         _replace_telephone_language_route(app)
 

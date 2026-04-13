@@ -9,5 +9,5 @@ class MoonshineSTT(STTModel):
     def __init__(self):
         self.moonshine_client = get_fastrtc_stt_model()
 
-    def stt(self, audio_data) -> str:
+    def stt(self, audio_data, **kwargs) -> str:
         return self.moonshine_client.stt(audio_data)

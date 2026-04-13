@@ -33,7 +33,7 @@ class FasterWhisperSTT(STTModel):
         self.options.api_url = _validate_api_url(api_url)
         self.client = OpenAI(api_key="", base_url=f"{self.options.api_url}/v1")
 
-    def stt(self, audio_data) -> str:
+    def stt(self, audio_data, **kwargs) -> str:
         response = self.client.audio.transcriptions.create(
             file=("audio.wav", audio_to_bytes(audio_data)),
             model=self.options.model,

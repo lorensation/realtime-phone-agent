@@ -69,18 +69,36 @@ PROMPTS__ESCALATION__NAME=blue_sardine.receptionist.escalation
 PROMPTS__STYLE__NAME=blue_sardine.receptionist.style
 ```
 
+## Primary Deployment Architecture
+
+The primary production path for this repo is now:
+
+- Main app: one RunPod CPU pod running the FastAPI/FastRTC hotel receptionist.
+- STT: Groq Whisper API via `STT_MODEL=whisper-groq`.
+- TTS: Mistral Voxtral API via `TTS_MODEL=mistral-voxtral`.
+- Retrieval: external Qdrant plus the bundled hotel KB.
+- Observability: Opik prompt loading and tracing when configured.
+
+Twilio should point inbound calls to:
+
+```text
+/voice/telephone/incoming
+```
+
+That route performs the language selection step and then connects the caller to the English or Spanish media stream handler.
+
 ## Audio Routing
 
 The voice stack supports these providers:
 
 - STT: `moonshine`, `whisper-groq`, `faster-whisper`
-- TTS: `kokoro`, `together`, `orpheus-runpod`
+- TTS: `mistral-voxtral`, `kokoro`, `together`, `orpheus-runpod`
 
-The bilingual call flow can now prompt callers to choose English or Spanish at the start of the call. English callers keep the Orpheus TTS path, while Spanish callers use ElevenLabs TTS by enabling:
+The production default is:
 
 ```env
-CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
-ELEVENLABS__API_KEY=YOUR_ELEVENLABS_KEY
+STT_MODEL=whisper-groq
+TTS_MODEL=mistral-voxtral
 ```
 
 Lookup cues are no longer mandatory on every retrieval turn. The default behavior is direct and natural, with optional brief pauses controlled by:
@@ -90,6 +108,15 @@ CALL_FLOW__TOOL_USE_PREAMBLE_MODE=auto
 CALL_FLOW__LOOKUP_SOUND_MODE=auto
 CALL_FLOW__LOOKUP_LATENCY_THRESHOLD_MS=1200
 ```
+
+## Legacy Audio Pods
+
+The repo still includes the older RunPod helpers for self-hosted Faster Whisper and Orpheus, but they are fallback paths only in this iteration:
+
+- `make create-faster-whisper-pod`
+- `make create-orpheus-pod`
+
+They are no longer required for the primary deployment flow.
 
 For the full env setup and RunPod helper commands, see [docs/GETTINGS_STARTED.md](docs/GETTINGS_STARTED.md).
 

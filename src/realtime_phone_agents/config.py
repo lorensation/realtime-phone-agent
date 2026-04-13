@@ -12,7 +12,7 @@ class GroqSettings(BaseModel):
     )
     model: str = Field(default="openai/gpt-oss-20b", description="Groq Model to use")
     stt_model: str = Field(
-        default="whisper-large-v3", description="Groq STT model to use"
+        default="whisper-large-v3-turbo", description="Groq STT model to use"
     )
 
 
@@ -73,6 +73,22 @@ class QdrantSettings(BaseModel):
 # --- RunPod Configuration ---
 class RunPodSettings(BaseModel):
     api_key: str = Field(default="", description="RunPod API Key")
+    call_center_image_name: str = Field(
+        default="",
+        description="Container image for the main call center application pod",
+    )
+    call_center_instance_id: str = Field(
+        default="cpu5c-2-4",
+        description="RunPod CPU instance ID for the main call center pod",
+    )
+    call_center_volume_gb: int = Field(
+        default=20,
+        description="Persistent volume size in GB for the main call center pod",
+    )
+    call_center_volume_mount_path: str = Field(
+        default="/workspace",
+        description="Volume mount path for the main call center pod",
+    )
     faster_whisper_gpu_type: str = Field(
         default="NVIDIA GeForce RTX 4090", description="Faster Whisper GPU type"
     )
@@ -153,6 +169,39 @@ class ElevenLabsSettings(BaseModel):
     )
 
 
+# --- Mistral TTS Configuration ---
+class MistralTTSSettings(BaseModel):
+    api_key: str = Field(default="", description="Mistral API key")
+    base_url: str = Field(
+        default="https://api.mistral.ai/v1",
+        description="Mistral base URL",
+    )
+    tts_model: str = Field(
+        default="voxtral-tts-2603",
+        description="Mistral Voxtral TTS model identifier",
+    )
+    voice_id: str = Field(
+        default="",
+        description="Default multilingual Mistral voice ID",
+    )
+    voice_id_en: str = Field(
+        default="",
+        description="Optional English-specific Mistral voice ID override",
+    )
+    voice_id_es: str = Field(
+        default="",
+        description="Optional Spanish-specific Mistral voice ID override",
+    )
+    response_format: str = Field(
+        default="pcm",
+        description="Mistral speech response format. PCM is recommended for streaming.",
+    )
+    sample_rate_hz: int = Field(
+        default=24000,
+        description="Assumed sample rate for PCM speech responses",
+    )
+
+
 # --- Opik Configuration ---
 class OpikSettings(BaseModel):
     api_key: str = Field(default="", description="Opik API key")
@@ -222,6 +271,28 @@ class CallFlowSettings(BaseModel):
     )
 
 
+# --- Twilio Configuration ---
+class TwilioSettings(BaseModel):
+    account_sid: str = Field(default="", description="Twilio Account SID")
+    auth_token: str = Field(default="", description="Twilio Auth Token")
+    from_number: str = Field(
+        default="",
+        description="Default Twilio number for outbound-call CLI usage",
+    )
+    status_callback_url: str = Field(
+        default="",
+        description="Optional Twilio call status callback URL",
+    )
+
+
+# --- Server Configuration ---
+class ServerSettings(BaseModel):
+    public_base_url: str = Field(
+        default="",
+        description="Canonical public HTTPS base URL for the deployed application",
+    )
+
+
 # --- Settings Configuration ---
 class Settings(BaseSettings):
     groq: GroqSettings = Field(default_factory=GroqSettings)
@@ -237,16 +308,19 @@ class Settings(BaseSettings):
     )
     together: TogetherTTSSettings = Field(default_factory=TogetherTTSSettings)
     elevenlabs: ElevenLabsSettings = Field(default_factory=ElevenLabsSettings)
+    mistral: MistralTTSSettings = Field(default_factory=MistralTTSSettings)
     opik: OpikSettings = Field(default_factory=OpikSettings)
     prompts: PromptSettings = Field(default_factory=PromptSettings)
     call_flow: CallFlowSettings = Field(default_factory=CallFlowSettings)
+    twilio: TwilioSettings = Field(default_factory=TwilioSettings)
+    server: ServerSettings = Field(default_factory=ServerSettings)
     stt_model: str = Field(
-        default="faster-whisper",
+        default="whisper-groq",
         description="STT provider to use (moonshine, whisper-groq, faster-whisper)",
     )
     tts_model: str = Field(
-        default="orpheus-runpod",
-        description="TTS provider to use (kokoro, together, orpheus-runpod)",
+        default="mistral-voxtral",
+        description="TTS provider to use (mistral-voxtral, kokoro, together, orpheus-runpod)",
     )
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
