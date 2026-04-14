@@ -75,7 +75,7 @@ The primary production path for this repo is now:
 
 - Main app: one RunPod CPU pod running the FastAPI/FastRTC hotel receptionist.
 - STT: Groq Whisper API via `STT_MODEL=whisper-groq`.
-- TTS: Mistral Voxtral API via `TTS_MODEL=mistral-voxtral`.
+- TTS: ElevenLabs API via `TTS_MODEL=elevenlabs`.
 - Retrieval: external Qdrant plus the bundled hotel KB.
 - Observability: Opik prompt loading and tracing when configured.
 
@@ -85,20 +85,20 @@ Twilio should point inbound calls to:
 /voice/telephone/incoming
 ```
 
-That route performs the language selection step and then connects the caller to the English or Spanish media stream handler.
+That route plays a short greeting and then connects the caller directly to the single Twilio media stream handler.
 
 ## Audio Routing
 
 The voice stack supports these providers:
 
 - STT: `moonshine`, `whisper-groq`, `faster-whisper`
-- TTS: `mistral-voxtral`, `kokoro`, `together`, `orpheus-runpod`
+- TTS: `elevenlabs`, `mistral-voxtral`, `kokoro`, `together`, `orpheus-runpod`
 
 The production default is:
 
 ```env
 STT_MODEL=whisper-groq
-TTS_MODEL=mistral-voxtral
+TTS_MODEL=elevenlabs
 ```
 
 Lookup cues are no longer mandatory on every retrieval turn. The default behavior is direct and natural, with optional brief pauses controlled by:

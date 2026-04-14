@@ -23,6 +23,14 @@ def _value_present(value: object) -> bool:
     return value is not None
 
 
+def _looks_like_placeholder_base_url(base_url: str) -> bool:
+    normalized = (base_url or "").strip().upper()
+    return any(
+        marker in normalized
+        for marker in ("YOUR-RUNPOD-URL", "<RUNPOD-URL>", "YOUR_PUBLIC_BASE_URL")
+    )
+
+
 def _validate_required_fields(include_outbound: bool) -> list[str]:
     errors: list[str] = []
 
@@ -32,11 +40,10 @@ def _validate_required_fields(include_outbound: bool) -> list[str]:
         "RUNPOD__CALL_CENTER_INSTANCE_ID": settings.runpod.call_center_instance_id,
         "GROQ__API_KEY": settings.groq.api_key,
         "GROQ__MODEL": settings.groq.model,
-        "MISTRAL__API_KEY": settings.mistral.api_key,
-        "MISTRAL__VOICE_ID / per-language override": settings.mistral.voice_id
-        or settings.mistral.voice_id_en
-        or settings.mistral.voice_id_es,
-        "SERVER__PUBLIC_BASE_URL": settings.server.public_base_url,
+        "ELEVENLABS__API_KEY": settings.elevenlabs.api_key,
+        "ELEVENLABS__VOICE_ID / per-language override": settings.elevenlabs.voice_id
+        or settings.elevenlabs.voice_id_en
+        or settings.elevenlabs.voice_id_es,
         "OPENAI__API_KEY": settings.openai.api_key,
         "QDRANT__HOST": settings.qdrant.host,
         "QDRANT__PORT": settings.qdrant.port,
@@ -49,13 +56,20 @@ def _validate_required_fields(include_outbound: bool) -> list[str]:
         if not _value_present(value):
             errors.append(f"Missing required setting: {env_name}")
 
+    if settings.server.public_base_url and _looks_like_placeholder_base_url(
+        settings.server.public_base_url
+    ):
+        errors.append(
+            "SERVER__PUBLIC_BASE_URL must be set to a real deployed HTTPS URL, not the example placeholder."
+        )
+
     if settings.stt_model != "whisper-groq":
         errors.append(
             f"STT_MODEL must be 'whisper-groq' for the primary deployment path, got '{settings.stt_model}'."
         )
-    if settings.tts_model != "mistral-voxtral":
+    if settings.tts_model != "elevenlabs":
         errors.append(
-            f"TTS_MODEL must be 'mistral-voxtral' for the primary deployment path, got '{settings.tts_model}'."
+            f"TTS_MODEL must be 'elevenlabs' for the primary deployment path, got '{settings.tts_model}'."
         )
     if settings.knowledge_base.auto_ingest_default_bundle:
         errors.append(
@@ -84,7 +98,9 @@ def main() -> int:
     print(f"- STT_MODEL={settings.stt_model}")
     print(f"- TTS_MODEL={settings.tts_model}")
     print(f"- RunPod image={settings.runpod.call_center_image_name}")
-    print(f"- Public base URL={settings.server.public_base_url}")
+    print(
+        f"- Public base URL={settings.server.public_base_url or '(blank; forwarded headers will be used)'}"
+    )
     return 0
 
 

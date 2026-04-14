@@ -3,10 +3,13 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from realtime_phone_agents.infrastructure.superlinked.service import (
     KnowledgeSearchService,
 )
+from realtime_phone_agents.agent.tools.property_search import _search_hotel_kb
 from realtime_phone_agents.knowledge.intent_router import (
     detect_amenity_type,
     detect_intent,
@@ -235,6 +238,74 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             all(item["doc_type"] == "dialogue_exemplar" for item in response["results"])
         )
+
+    async def test_search_loads_bundle_metadata_without_auto_ingest(self):
+        service = KnowledgeSearchService(None, None, None, None, force_in_memory=True)
+        service._search_across_doc_types = AsyncMock(return_value=[])
+
+        fake_settings = SimpleNamespace(
+            knowledge_base=SimpleNamespace(
+                auto_ingest_default_bundle=False,
+                default_bundle_path=str(BUNDLE_PATH),
+                collection_name="hotel-knowledge",
+            )
+        )
+
+        with patch(
+            "realtime_phone_agents.infrastructure.superlinked.service.settings",
+            fake_settings,
+        ):
+            response = await service.search_knowledge("Necesito el telefono del hotel")
+
+        self.assertEqual(response["result_count"], 0)
+        self.assertIn("phone", response["fallback_contact"])
+
+    async def test_search_normalizes_friendly_hotel_name_to_canonical_id(self):
+        response = await self.service.search_knowledge(
+            "Quiero informacion sobre las habitaciones",
+            hotel_id="Blue Sardine Altea",
+            limit=3,
+        )
+
+        self.assertEqual(response["filters"]["hotel_id"], "blue_sardine_altea")
+
+    async def test_search_normalizes_operational_section_alias(self):
+        response = await self.service.search_knowledge(
+            "Necesito saber los horarios de recepcion",
+            section="operational",
+            limit=3,
+        )
+
+        self.assertEqual(response["filters"]["section"], "operations")
+
+    async def test_property_search_tool_returns_fallback_payload_on_query_error(self):
+        with patch(
+            "realtime_phone_agents.agent.tools.property_search.get_knowledge_search_service"
+        ) as mock_get_service:
+            fake_bundle = SimpleNamespace(
+                contact=SimpleNamespace(
+                    model_dump=lambda mode="json": {
+                        "phone": "+34 629 610 233",
+                        "email": "info@bluesardinealtea.com",
+                    }
+                )
+            )
+            fake_service = SimpleNamespace(
+                bundle=fake_bundle,
+                search_knowledge=AsyncMock(side_effect=RuntimeError("boom")),
+            )
+            mock_get_service.return_value = fake_service
+
+            response = json.loads(
+                await _search_hotel_kb(
+                    query="Necesito saber sobre las habitaciones",
+                    hotel_id="Blue Sardine Altea",
+                )
+            )
+
+        self.assertEqual(response["error"], "knowledge_search_failed")
+        self.assertIn("fallback_contact", response)
+        self.assertEqual(response["filters"]["hotel_id"], "Blue Sardine Altea")
 
 
 if __name__ == "__main__":

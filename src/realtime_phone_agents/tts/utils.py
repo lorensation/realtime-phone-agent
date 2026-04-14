@@ -12,6 +12,14 @@ def get_tts_model(model_name: str, *, language: str | None = None) -> TTSModel:
     """Return the configured TTS provider by name."""
     if model_name == "kokoro":
         return KokoroTTSModel()
+    if model_name in {
+        "elevenlabs",
+        "elevenlabs-multilingual",
+        "elevenlabs-es",
+        "elevenlabs-flash",
+        "elevenlabs-flash-es",
+    }:
+        return ElevenLabsTTSModel(language_code=language)
     if model_name in {"mistral-voxtral", "mistral", "voxtral"}:
         return MistralVoxtralTTSModel(language=language)
     if model_name == "orpheus-runpod":
@@ -19,11 +27,9 @@ def get_tts_model(model_name: str, *, language: str | None = None) -> TTSModel:
         logger.info("Warming up Orpheus TTS model")
         model.tts_blocking("Warm up the speech model")
         return model
-    if model_name in {"elevenlabs-es", "elevenlabs-flash-es"}:
-        return ElevenLabsTTSModel()
     if model_name == "together":
         return TogetherTTSModel()
     raise ValueError(
         "Invalid TTS model name: "
-        f"{model_name}. Available: mistral-voxtral, kokoro, together, orpheus-runpod, elevenlabs-es"
+        f"{model_name}. Available: elevenlabs, mistral-voxtral, kokoro, together, orpheus-runpod"
     )

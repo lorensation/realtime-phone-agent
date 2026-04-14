@@ -16,12 +16,11 @@ from realtime_phone_agents.agent.fastrtc_agent import (
     chunk_text,
     classify_language_selection,
 )
+from realtime_phone_agents.agent.stream import VoiceAgentStream
 from realtime_phone_agents.api.routes.voice import (
-    _build_connect_twiml,
-    _build_language_gather_twiml,
     _remove_internal_telephone_routes,
     _replace_telephone_incoming_route,
-    _replace_telephone_language_route,
+    mount_voice_stream,
 )
 from realtime_phone_agents.agent.tools.property_search import search_hotel_kb_tool
 from realtime_phone_agents.config import Settings
@@ -37,9 +36,8 @@ from realtime_phone_agents.tts.runpod.orpheus.options import OrpheusTTSOptions
 from realtime_phone_agents.tts.togetherai.model import TogetherTTSModel
 from realtime_phone_agents.tts.togetherai.options import TogetherTTSOptions
 from realtime_phone_agents.tts.utils import get_tts_model
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi import Request as FastAPIRequest
-from fastapi.testclient import TestClient
 
 
 def load_gradio_launcher_module():
@@ -93,7 +91,7 @@ class SettingsParsingTests(unittest.TestCase):
         settings = Settings(
             _env_file=None,
             stt_model="moonshine",
-            tts_model="mistral-voxtral",
+            tts_model="elevenlabs",
             faster_whisper={
                 "api_url": "https://faster-whisper.example",
                 "model": "Systran/faster-whisper-large-v3",
@@ -108,6 +106,8 @@ class SettingsParsingTests(unittest.TestCase):
             },
             elevenlabs={
                 "api_key": "eleven-key",
+                "voice_id": "voice-default",
+                "voice_id_en": "voice-en",
                 "voice_id_es": "voice-es",
                 "output_format": "pcm_16000",
             },
@@ -146,7 +146,7 @@ class SettingsParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(settings.stt_model, "moonshine")
-        self.assertEqual(settings.tts_model, "mistral-voxtral")
+        self.assertEqual(settings.tts_model, "elevenlabs")
         self.assertEqual(
             settings.faster_whisper.api_url, "https://faster-whisper.example"
         )
@@ -157,6 +157,8 @@ class SettingsParsingTests(unittest.TestCase):
         self.assertEqual(settings.orpheus_spanish.voice, "Maria")
         self.assertEqual(settings.together.api_key, "together-key")
         self.assertEqual(settings.elevenlabs.api_key, "eleven-key")
+        self.assertEqual(settings.elevenlabs.voice_id, "voice-default")
+        self.assertEqual(settings.elevenlabs.voice_id_en, "voice-en")
         self.assertEqual(settings.elevenlabs.output_format, "pcm_16000")
         self.assertEqual(settings.mistral.api_key, "mistral-key")
         self.assertEqual(settings.mistral.voice_id_es, "voice-es")
@@ -226,8 +228,9 @@ class TTSFactoryTests(unittest.TestCase):
         with patch(
             "realtime_phone_agents.tts.utils.ElevenLabsTTSModel",
             return_value="elevenlabs",
-        ):
-            self.assertEqual(get_tts_model("elevenlabs-es"), "elevenlabs")
+        ) as elevenlabs_factory:
+            self.assertEqual(get_tts_model("elevenlabs", language="es-ES"), "elevenlabs")
+            elevenlabs_factory.assert_called_once_with(language_code="es-ES")
 
     def test_get_tts_model_rejects_invalid_name(self):
         with self.assertRaises(ValueError):
@@ -449,6 +452,7 @@ class ElevenLabsTTSModelTests(unittest.TestCase):
                 model_id="eleven_flash_v2_5",
                 voice_id="voice-es",
                 output_format="pcm_16000",
+                language_code="es-ES",
             )
             chunks = asyncio.run(
                 collect_audio(
@@ -471,7 +475,7 @@ class ElevenLabsTTSModelTests(unittest.TestCase):
         )
         self.assertEqual(FakeClient.last_request[3], {"output_format": "pcm_16000"})
         self.assertEqual(FakeClient.last_request[4]["model_id"], "eleven_flash_v2_5")
-        self.assertEqual(FakeClient.last_request[4]["language_code"], "es")
+        self.assertEqual(FakeClient.last_request[4]["language_code"], "es-ES")
         self.assertEqual(FakeClient.last_request[4]["apply_text_normalization"], "auto")
         self.assertEqual(FakeClient.last_request[4]["previous_text"], "bienvenido")
         self.assertEqual(FakeClient.last_request[4]["next_text"], "gracias")
@@ -941,20 +945,15 @@ class LanguageSelectionTests(unittest.TestCase):
 
     def test_missing_primary_language_tts_config_fails_fast_when_feature_enabled(self):
         fake_settings = self._build_fake_settings(enabled=True)
-        fake_settings.tts_model = "mistral-voxtral"
-        fake_settings.mistral = SimpleNamespace(
-            api_key="mistral-key",
-            base_url="https://api.mistral.example/v1",
-            tts_model="voxtral-tts-2603",
-            voice_id="",
-            voice_id_en="",
-            voice_id_es="",
-            response_format="pcm",
-            sample_rate_hz=24000,
-        )
+        fake_settings.tts_model = "elevenlabs"
 
         with (
             patch.object(agent_module, "settings", fake_settings),
+            patch.object(
+                agent_module,
+                "get_tts_model",
+                side_effect=ValueError("missing ElevenLabs voice configuration"),
+            ),
             patch.object(
                 FastRTCAgent,
                 "_create_react_agent",
@@ -1122,7 +1121,7 @@ class LookupCuePolicyTests(unittest.TestCase):
 
 
 class VoiceRouteTests(unittest.TestCase):
-    def test_build_language_gather_twiml_contains_gather_and_action(self):
+    def test_voice_stream_handle_incoming_call_connects_directly_to_single_handler(self):
         request = FastAPIRequest(
             {
                 "type": "http",
@@ -1141,45 +1140,18 @@ class VoiceRouteTests(unittest.TestCase):
             }
         )
 
-        twiml = _build_language_gather_twiml(request)
+        with patch(
+            "realtime_phone_agents.agent.stream.settings",
+            SimpleNamespace(server=SimpleNamespace(public_base_url="")),
+        ):
+            response = asyncio.run(
+                VoiceAgentStream.handle_incoming_call(object(), request)
+            )
+            twiml = response.body.decode("utf-8")
 
-        self.assertIn("<Gather", twiml)
-        self.assertIn(
-            'action="https://demo.example.com/voice/telephone/language?retry=0"',
-            twiml,
-        )
-        self.assertIn('input="dtmf speech"', twiml)
-        self.assertIn('actionOnEmptyResult="true"', twiml)
-        self.assertIn("For English press two or say English.", twiml)
-
-    def test_build_connect_twiml_routes_to_language_specific_handler(self):
-        request = FastAPIRequest(
-            {
-                "type": "http",
-                "method": "POST",
-                "scheme": "https",
-                "path": "/voice/telephone/language",
-                "headers": [
-                    (b"host", b"localhost:8000"),
-                    (b"x-forwarded-host", b"demo.example.com"),
-                    (b"x-forwarded-proto", b"https"),
-                ],
-                "query_string": b"",
-                "server": ("localhost", 8000),
-                "client": ("127.0.0.1", 12345),
-                "http_version": "1.1",
-            }
-        )
-
-        twiml = _build_connect_twiml(
-            request,
-            voice_path="/voice-es",
-            greeting="Gracias",
-            language="es-ES",
-        )
-
-        self.assertIn("wss://demo.example.com/voice-es/telephone/handler", twiml)
+        self.assertIn("wss://demo.example.com/voice/telephone/handler", twiml)
         self.assertIn("<Say", twiml)
+        self.assertNotIn("<Gather", twiml)
 
     def test_replace_telephone_incoming_route_replaces_existing_mount_route(self):
         app = FastAPI()
@@ -1189,8 +1161,13 @@ class VoiceRouteTests(unittest.TestCase):
             methods=["POST"],
             include_in_schema=False,
         )
+        stream = SimpleNamespace(
+            handle_incoming_call=MagicMock(
+                return_value=Response("ok", media_type="application/xml")
+            )
+        )
 
-        _replace_telephone_incoming_route(app)
+        _replace_telephone_incoming_route(app, stream)
 
         matching_routes = [
             route
@@ -1202,71 +1179,44 @@ class VoiceRouteTests(unittest.TestCase):
 
     def test_remove_internal_telephone_routes_keeps_only_public_entrypoint(self):
         app = FastAPI()
+        app.add_api_route("/voice/telephone/language", lambda: None, methods=["POST"])
         app.add_api_route(
             "/voice-en/telephone/incoming", lambda: None, methods=["POST"]
         )
         app.add_api_route(
             "/voice-es/telephone/incoming", lambda: None, methods=["POST"]
         )
+        app.add_api_route("/voice-en/telephone/handler", lambda: None, methods=["GET"])
+        app.add_api_route("/voice-es/telephone/handler", lambda: None, methods=["GET"])
 
         _remove_internal_telephone_routes(app)
 
         remaining_paths = {getattr(route, "path", None) for route in app.router.routes}
+        self.assertNotIn("/voice/telephone/language", remaining_paths)
         self.assertNotIn("/voice-en/telephone/incoming", remaining_paths)
         self.assertNotIn("/voice-es/telephone/incoming", remaining_paths)
+        self.assertNotIn("/voice-en/telephone/handler", remaining_paths)
+        self.assertNotIn("/voice-es/telephone/handler", remaining_paths)
 
-    def test_language_route_connects_to_spanish_and_english_handlers(self):
+    def test_mount_voice_stream_keeps_single_public_voice_handler(self):
+        fake_stream = SimpleNamespace(
+            mount=MagicMock(),
+            handle_incoming_call=MagicMock(
+                return_value=Response("ok", media_type="application/xml")
+            ),
+        )
+        fake_agent = SimpleNamespace(stream=fake_stream)
         app = FastAPI()
-        _replace_telephone_language_route(app)
-        client = TestClient(app, base_url="https://demo.example.com")
 
-        spanish = client.post(
-            "/voice/telephone/language?retry=0",
-            data={"Digits": "1"},
-            headers={
-                "x-forwarded-host": "demo.example.com",
-                "x-forwarded-proto": "https",
-            },
-        )
-        english = client.post(
-            "/voice/telephone/language?retry=0",
-            data={"Digits": "2"},
-            headers={
-                "x-forwarded-host": "demo.example.com",
-                "x-forwarded-proto": "https",
-            },
-        )
+        with patch(
+            "realtime_phone_agents.api.routes.voice.FastRTCAgent",
+            return_value=fake_agent,
+        ):
+            mount_voice_stream(app)
 
-        self.assertEqual(spanish.status_code, 200)
-        self.assertIn(
-            "wss://demo.example.com/voice-es/telephone/handler",
-            spanish.text,
-        )
-        self.assertIn(
-            "wss://demo.example.com/voice-en/telephone/handler",
-            english.text,
-        )
-
-    def test_language_route_defaults_to_spanish_after_retry_limit(self):
-        app = FastAPI()
-        _replace_telephone_language_route(app)
-        client = TestClient(app, base_url="https://demo.example.com")
-
-        response = client.post(
-            "/voice/telephone/language?retry=2",
-            data={"SpeechResult": "no entiendo"},
-            headers={
-                "x-forwarded-host": "demo.example.com",
-                "x-forwarded-proto": "https",
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            "wss://demo.example.com/voice-es/telephone/handler",
-            response.text,
-        )
-        self.assertIn("Continuare en espanol", response.text)
+        fake_stream.mount.assert_called_once_with(app, path="/voice")
+        self.assertIn("/voice/telephone/incoming", {route.path for route in app.router.routes})
+        self.assertNotIn("/voice/telephone/language", {route.path for route in app.router.routes})
 
     def test_public_base_url_override_is_used_for_twiml(self):
         request = FastAPIRequest(
@@ -1288,21 +1238,51 @@ class VoiceRouteTests(unittest.TestCase):
         )
 
         with patch(
-            "realtime_phone_agents.api.routes.voice.settings",
+            "realtime_phone_agents.agent.stream.settings",
             SimpleNamespace(
                 server=SimpleNamespace(public_base_url="https://hotel.example"),
-                call_flow=SimpleNamespace(selection_retry_limit=2),
-                tts_model="mistral-voxtral",
             ),
         ):
-            twiml = _build_connect_twiml(
-                request,
-                voice_path="/voice-en",
-                greeting="Hello",
-                language="en-US",
+            response = asyncio.run(
+                VoiceAgentStream.handle_incoming_call(object(), request)
             )
+            twiml = response.body.decode("utf-8")
 
-        self.assertIn("wss://hotel.example/voice-en/telephone/handler", twiml)
+        self.assertIn("wss://hotel.example/voice/telephone/handler", twiml)
+
+    def test_placeholder_public_base_url_falls_back_to_forwarded_headers(self):
+        request = FastAPIRequest(
+            {
+                "type": "http",
+                "method": "POST",
+                "scheme": "http",
+                "path": "/voice/telephone/incoming",
+                "headers": [
+                    (b"host", b"localhost:8000"),
+                    (b"x-forwarded-host", b"demo.example.com"),
+                    (b"x-forwarded-proto", b"https"),
+                ],
+                "query_string": b"",
+                "server": ("localhost", 8000),
+                "client": ("127.0.0.1", 12345),
+                "http_version": "1.1",
+            }
+        )
+
+        with patch(
+            "realtime_phone_agents.agent.stream.settings",
+            SimpleNamespace(
+                server=SimpleNamespace(
+                    public_base_url="https://YOUR-RUNPOD-URL.proxy.runpod.net"
+                ),
+            ),
+        ):
+            response = asyncio.run(
+                VoiceAgentStream.handle_incoming_call(object(), request)
+            )
+            twiml = response.body.decode("utf-8")
+
+        self.assertIn("wss://demo.example.com/voice/telephone/handler", twiml)
 
 
 class RunPodLauncherTests(unittest.TestCase):

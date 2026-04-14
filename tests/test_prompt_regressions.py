@@ -5,6 +5,7 @@ from unittest.mock import patch
 from realtime_phone_agents.agent.prompts.builder import build_system_prompt
 from realtime_phone_agents.agent.prompts.provider import ResolvedPrompt
 import realtime_phone_agents.agent.prompts.builder as builder_module
+from realtime_phone_agents.agent.fastrtc_agent import normalize_spoken_text
 
 
 class PromptRegressionTests(unittest.TestCase):
@@ -70,3 +71,18 @@ class PromptRegressionTests(unittest.TestCase):
 
         self.assertIn("Reply only in English", english_prompt.text)
         self.assertIn("Responda solo en espanol", spanish_prompt.text)
+
+    def test_spoken_text_normalizer_removes_markdown_formatting(self):
+        text = (
+            "**Blue Apartment** - 50 m²\n"
+            "- kitchen\n"
+            "- balcony\n"
+            "### Amenities"
+        )
+
+        normalized = normalize_spoken_text(text)
+
+        self.assertNotIn("**", normalized)
+        self.assertNotIn("###", normalized)
+        self.assertNotIn("\n", normalized)
+        self.assertIn("Blue Apartment", normalized)

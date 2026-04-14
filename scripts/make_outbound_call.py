@@ -8,6 +8,14 @@ from twilio.rest import Client
 from realtime_phone_agents.config import settings
 
 
+def _looks_like_placeholder_base_url(base_url: str) -> bool:
+    normalized = (base_url or "").strip().upper()
+    return any(
+        marker in normalized
+        for marker in ("YOUR-RUNPOD-URL", "<RUNPOD-URL>", "YOUR_PUBLIC_BASE_URL")
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Create an outbound phone call using the local Twilio credentials."
@@ -46,6 +54,10 @@ def _normalize_public_base_url(base_url: str) -> str:
     cleaned = base_url.strip().rstrip("/")
     if not cleaned.startswith(("http://", "https://")):
         raise ValueError("Public base URL must start with http:// or https://")
+    if _looks_like_placeholder_base_url(cleaned):
+        raise ValueError(
+            "Public base URL must be a real deployed URL, not the example placeholder."
+        )
     return cleaned
 
 

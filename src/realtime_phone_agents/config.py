@@ -159,9 +159,17 @@ class ElevenLabsSettings(BaseModel):
     model_id: str = Field(
         default="eleven_flash_v2_5", description="ElevenLabs TTS model id"
     )
+    voice_id: str = Field(
+        default="Sp57wugtIMQc3lhms94f",
+        description="Default multilingual ElevenLabs voice id",
+    )
+    voice_id_en: str = Field(
+        default="",
+        description="Optional English-specific ElevenLabs voice id override",
+    )
     voice_id_es: str = Field(
-        default="gJlzF5JxsCvM5hQAoRyD",
-        description="Spanish ElevenLabs voice id",
+        default="",
+        description="Optional Spanish-specific ElevenLabs voice id override",
     )
     output_format: str = Field(
         default="pcm_16000",
@@ -220,6 +228,10 @@ class PromptSettings(BaseModel):
     remote_enabled: bool = Field(
         default=True,
         description="Fetch prompts from Opik when configured before using local fallbacks",
+    )
+    refresh_interval_seconds: int = Field(
+        default=300,
+        description="How often unpinned prompts may be refreshed from Opik for new calls",
     )
     core: PromptComponentSettings = Field(
         default_factory=lambda: PromptComponentSettings(
@@ -319,8 +331,8 @@ class Settings(BaseSettings):
         description="STT provider to use (moonshine, whisper-groq, faster-whisper)",
     )
     tts_model: str = Field(
-        default="mistral-voxtral",
-        description="TTS provider to use (mistral-voxtral, kokoro, together, orpheus-runpod)",
+        default="elevenlabs",
+        description="TTS provider to use (elevenlabs, mistral-voxtral, kokoro, together, orpheus-runpod)",
     )
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(

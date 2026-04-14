@@ -33,7 +33,7 @@ def ulaw_bytes_to_int16(ulaw_bytes: bytes) -> NDArray[np.int16]:
 
 
 class ElevenLabsTTSModel(TTSModel):
-    """Streaming ElevenLabs TTS client for the Spanish telephony path."""
+    """Streaming ElevenLabs TTS client for multilingual telephony."""
 
     def __init__(
         self,
@@ -42,27 +42,48 @@ class ElevenLabsTTSModel(TTSModel):
         model_id: str | None = None,
         voice_id: str | None = None,
         output_format: str | None = None,
-        language_code: str = "es",
+        language_code: str | None = None,
         apply_text_normalization: str = "auto",
     ) -> None:
         self.api_key = api_key or settings.elevenlabs.api_key
         self.model_id = model_id or settings.elevenlabs.model_id
-        self.voice_id = voice_id or settings.elevenlabs.voice_id_es
-        self.output_format = output_format or settings.elevenlabs.output_format
         self.language_code = language_code
+        self.voice_id = self._resolve_voice_id(
+            voice_id=voice_id,
+            language_code=language_code,
+        )
+        self.output_format = output_format or settings.elevenlabs.output_format
         self.apply_text_normalization = apply_text_normalization
         self.encoding, self.sample_rate = _parse_output_format(self.output_format)
 
         if not self.api_key:
             raise ValueError(
-                "ElevenLabs API key is required for elevenlabs-es. "
+                "ElevenLabs API key is required for elevenlabs. "
                 "Set ELEVENLABS__API_KEY in your environment."
             )
         if not self.voice_id:
             raise ValueError(
-                "ElevenLabs voice id is required for elevenlabs-es. "
-                "Set ELEVENLABS__VOICE_ID_ES in your environment."
+                "ElevenLabs voice id is required for elevenlabs. "
+                "Set ELEVENLABS__VOICE_ID or a language-specific override in your environment."
             )
+
+    def _resolve_voice_id(
+        self,
+        *,
+        voice_id: str | None,
+        language_code: str | None,
+    ) -> str:
+        if voice_id:
+            return voice_id
+
+        normalized_language = (language_code or "").lower()
+        if normalized_language.startswith("en") and settings.elevenlabs.voice_id_en:
+            return settings.elevenlabs.voice_id_en
+        if normalized_language.startswith("es") and settings.elevenlabs.voice_id_es:
+            return settings.elevenlabs.voice_id_es
+        if settings.elevenlabs.voice_id:
+            return settings.elevenlabs.voice_id
+        return settings.elevenlabs.voice_id_es
 
     def _request_payload(
         self,
@@ -74,9 +95,10 @@ class ElevenLabsTTSModel(TTSModel):
         payload = {
             "text": text.strip(),
             "model_id": self.model_id,
-            "language_code": self.language_code,
             "apply_text_normalization": self.apply_text_normalization,
         }
+        if self.language_code:
+            payload["language_code"] = self.language_code
         if previous_text:
             payload["previous_text"] = previous_text
         if next_text:

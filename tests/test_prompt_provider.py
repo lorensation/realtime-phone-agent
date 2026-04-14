@@ -78,10 +78,10 @@ class PromptProviderTests(unittest.TestCase):
         self.assertEqual(prompt.text, "remote prompt body")
         fake_prompt_client.get_all_prompt_versions.assert_called_once_with(
             name="blue_sardine.receptionist.core",
-            project_name="hotel-project",
+            project_name=None,
         )
 
-    def test_remote_prompt_fetch_uses_latest_project_scoped_version_when_unpinned(self):
+    def test_remote_prompt_fetch_uses_latest_global_version_when_unpinned(self):
         fake_settings = SimpleNamespace(
             opik=SimpleNamespace(api_key="opik-key", project_name="hotel-project"),
             prompts=SimpleNamespace(remote_enabled=True),

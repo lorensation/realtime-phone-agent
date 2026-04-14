@@ -4,7 +4,7 @@
 
 - One RunPod CPU pod for the main FastAPI/FastRTC app.
 - Groq Whisper for STT.
-- Mistral Voxtral for TTS.
+- ElevenLabs for TTS.
 - External Qdrant for retrieval.
 - Twilio inbound webhook pointed to `/voice/telephone/incoming`.
 
@@ -41,6 +41,10 @@ The helper prints the expected public URL and reminds you to set:
 SERVER__PUBLIC_BASE_URL=https://<pod-id>-8000.proxy.runpod.net
 ```
 
+For RunPod proxy pods, leave `SERVER__PUBLIC_BASE_URL` blank in the deployed pod.
+The proxy hostname changes on each new pod, so the app should derive the public host
+from forwarded headers instead of pinning a previous pod URL into the environment.
+
 ## 4. Ingest hotel knowledge into Qdrant
 
 Production should use explicit ingestion:
@@ -65,9 +69,8 @@ https://<runpod-url>/voice/telephone/incoming
 
 The app will:
 
-1. Return a language-selection TwiML `<Gather>`.
-2. Post the result to `/voice/telephone/language`.
-3. Connect Twilio to `/voice-es/telephone/handler` or `/voice-en/telephone/handler`.
+1. Return a short TwiML `<Say>`.
+2. Connect Twilio directly to `/voice/telephone/handler`.
 
 ## 6. Trigger outbound calls locally
 

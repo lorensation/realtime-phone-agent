@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +60,59 @@ class KnowledgeSearchService:
         self.loaded_bundle_path: str | None = None
 
         self._setup_app()
+
+    @staticmethod
+    def _normalize_identifier(value: str | None) -> str:
+        normalized = unicodedata.normalize("NFKD", value or "")
+        normalized = "".join(
+            char for char in normalized if not unicodedata.combining(char)
+        )
+        normalized = normalized.lower().strip()
+        return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
+
+    def _resolve_hotel_id(self, hotel_id: str | None) -> str | None:
+        candidate = (hotel_id or "").strip()
+        if not candidate:
+            return settings.knowledge_base.default_hotel_id
+
+        known_hotel_ids = {settings.knowledge_base.default_hotel_id}
+        if candidate in known_hotel_ids:
+            return candidate
+
+        candidate_key = self._normalize_identifier(candidate)
+        aliases = {
+            self._normalize_identifier(settings.knowledge_base.default_hotel_id): settings.knowledge_base.default_hotel_id,
+            self._normalize_identifier(
+                settings.knowledge_base.default_hotel_id.replace("_", " ")
+            ): settings.knowledge_base.default_hotel_id,
+        }
+
+        if self.bundle is not None:
+            aliases[self._normalize_identifier(self.bundle.hotel.property.name)] = (
+                settings.knowledge_base.default_hotel_id
+            )
+            aliases[self._normalize_identifier(self.bundle.manifest.property_name)] = (
+                settings.knowledge_base.default_hotel_id
+            )
+
+        return aliases.get(candidate_key, candidate)
+
+    def _resolve_section(self, section: str | None) -> str | None:
+        if not section:
+            return None
+        candidate = self._normalize_identifier(section).replace(" ", "_")
+        aliases = {
+            "operational": "operations",
+            "operation": "operations",
+            "operations": "operations",
+            "service": "services",
+            "services": "services",
+            "policy": "policies",
+            "policies": "policies",
+            "room": "rooms",
+            "rooms": "rooms",
+        }
+        return aliases.get(candidate, section)
 
     def _setup_app(self) -> None:
         """Setup Superlinked with Qdrant when available, otherwise fallback to memory."""
@@ -124,6 +179,30 @@ class KnowledgeSearchService:
         if self.loaded_bundle_path == str(default_path.resolve()):
             return
         self.ingest_knowledge_bundle(default_path)
+
+    def load_default_bundle_metadata(self) -> None:
+        """
+        Load the default bundle metadata into memory without re-ingesting vectors.
+
+        This keeps contact details, supported languages, and other bundle metadata
+        available when the search index has already been ingested into Qdrant.
+        """
+        default_path = Path(settings.knowledge_base.default_bundle_path)
+        if not default_path.exists():
+            logger.warning("Default knowledge bundle path not found: {}", default_path)
+            return
+
+        resolved_path = str(default_path.resolve())
+        if self.loaded_bundle_path == resolved_path and self.bundle is not None:
+            return
+
+        self.bundle = load_knowledge_bundle(default_path)
+        self.loaded_bundle_path = resolved_path
+        logger.info(
+            "Loaded knowledge bundle metadata {} from '{}'.",
+            self.bundle.manifest.kb_version,
+            resolved_path,
+        )
 
     def ingest_knowledge_bundle(self, bundle_path: str | Path) -> dict[str, Any]:
         bundle = load_knowledge_bundle(bundle_path)
@@ -372,6 +451,8 @@ class KnowledgeSearchService:
         if self.bundle is None:
             self.ingest_default_bundle_if_configured()
         if self.bundle is None:
+            self.load_default_bundle_metadata()
+        if self.bundle is None:
             raise RuntimeError("No hotel knowledge bundle has been ingested")
 
         context = build_retrieval_context(
@@ -396,12 +477,17 @@ class KnowledgeSearchService:
         entity_type = self._entity_type_for_intent(resolved_intent, query)
         language_filter = self._resolve_language_filter(context.filters.language)
 
+        resolved_hotel_id = self._resolve_hotel_id(context.filters.hotel_id)
+        resolved_section = self._resolve_section(context.filters.section)
+        context.filters.hotel_id = resolved_hotel_id
+        context.filters.section = resolved_section
+
         results = await self._search_across_doc_types(
             query=query,
             limit=limit,
-            hotel_id=context.filters.hotel_id,
+            hotel_id=resolved_hotel_id,
             entity_type=entity_type,
-            section=context.filters.section,
+            section=resolved_section,
             doc_types=context.filters.doc_types,
             room_type_id=context.filters.room_type_id,
             language=language_filter,
@@ -417,9 +503,9 @@ class KnowledgeSearchService:
             results = await self._search_across_doc_types(
                 query=query,
                 limit=limit,
-                hotel_id=context.filters.hotel_id,
+                hotel_id=resolved_hotel_id,
                 entity_type=entity_type,
-                section=context.filters.section,
+                section=resolved_section,
                 doc_types=context.filters.doc_types,
                 room_type_id=None,
                 language=language_filter,
@@ -435,7 +521,7 @@ class KnowledgeSearchService:
             results = await self._search_across_doc_types(
                 query=query,
                 limit=limit,
-                hotel_id=context.filters.hotel_id,
+                hotel_id=resolved_hotel_id,
                 entity_type=entity_type,
                 section=None,
                 doc_types=context.filters.doc_types,
@@ -453,7 +539,7 @@ class KnowledgeSearchService:
             results = await self._search_across_doc_types(
                 query=query,
                 limit=limit,
-                hotel_id=context.filters.hotel_id,
+                hotel_id=resolved_hotel_id,
                 entity_type=None,
                 section=None,
                 doc_types=context.filters.doc_types,

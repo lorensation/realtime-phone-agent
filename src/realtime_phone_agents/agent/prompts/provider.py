@@ -87,11 +87,10 @@ class PromptProvider:
         try:
             client = opik_client.get_client_cached()
             prompt_client = PromptClient(client.rest_client)
-            prompt_version = self._load_project_scoped_prompt_version(
+            prompt_version = self._load_prompt_version(
                 prompt_client=prompt_client,
                 prompt_name=ref.name,
                 commit=ref.commit or None,
-                project_name=settings.opik.project_name or None,
             )
             if prompt_version is None:
                 logger.info(
@@ -118,17 +117,16 @@ class PromptProvider:
             )
             return None
 
-    def _load_project_scoped_prompt_version(
+    def _load_prompt_version(
         self,
         *,
         prompt_client: Any,
         prompt_name: str,
         commit: str | None,
-        project_name: str | None,
     ) -> Any | None:
         versions = prompt_client.get_all_prompt_versions(
             name=prompt_name,
-            project_name=project_name,
+            project_name=None,
         )
         if not versions:
             return None
@@ -138,10 +136,9 @@ class PromptProvider:
                 if getattr(version, "commit", None) == commit:
                     return version
             logger.info(
-                "Opik prompt '{}' commit '{}' was not found in project '{}'.",
+                "Opik prompt '{}' commit '{}' was not found in the global prompt library.",
                 prompt_name,
                 commit,
-                project_name or "<default>",
             )
             return None
 

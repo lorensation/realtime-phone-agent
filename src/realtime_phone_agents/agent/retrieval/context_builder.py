@@ -22,6 +22,17 @@ FACTUAL_DOC_TYPES = [
 ]
 HANDOFF_DOC_TYPES = ["operational_note", "faq", "document"]
 STYLE_DOC_TYPES = ["dialogue_exemplar"]
+SECTION_ALIASES = {
+    "operational": "operations",
+    "operation": "operations",
+    "operations": "operations",
+    "service": "services",
+    "services": "services",
+    "policy": "policies",
+    "policies": "policies",
+    "room": "rooms",
+    "rooms": "rooms",
+}
 
 
 def build_retrieval_context(
@@ -43,7 +54,7 @@ def build_retrieval_context(
     resolved_room_type = room_type_id or extract_room_type_id(query)
     resolved_policy_type = policy_type or detect_policy_type(query)
     resolved_amenity_type = amenity_type or detect_amenity_type(query)
-    resolved_section = section or _section_from_intent(intent, query)
+    resolved_section = _normalize_section(section or _section_from_intent(intent, query))
     resolved_doc_types = doc_types or _doc_types_for_mode(search_mode, query)
 
     filters = RetrievalFilters(
@@ -109,3 +120,11 @@ def _section_from_intent(intent: str | None, query: str) -> str | None:
     if intent == "special_requests":
         return "operations"
     return None
+
+
+def _normalize_section(section: str | None) -> str | None:
+    if section is None:
+        return None
+    normalized = section.strip().lower().replace("-", "_")
+    normalized = normalized.replace("_note", "")
+    return SECTION_ALIASES.get(normalized, normalized)

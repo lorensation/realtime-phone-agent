@@ -13,7 +13,7 @@ def _require(value: str, env_name: str) -> str:
 
 
 def build_call_center_env() -> dict[str, str]:
-    return {
+    env = {
         "GROQ__API_KEY": settings.groq.api_key,
         "GROQ__BASE_URL": settings.groq.base_url,
         "GROQ__MODEL": settings.groq.model,
@@ -53,18 +53,19 @@ def build_call_center_env() -> dict[str, str]:
         "CALL_FLOW__LOOKUP_LATENCY_THRESHOLD_MS": str(
             settings.call_flow.lookup_latency_threshold_ms
         ),
-        "SERVER__PUBLIC_BASE_URL": settings.server.public_base_url,
         "STT_MODEL": settings.stt_model,
         "TTS_MODEL": settings.tts_model,
-        "MISTRAL__API_KEY": settings.mistral.api_key,
-        "MISTRAL__BASE_URL": settings.mistral.base_url,
-        "MISTRAL__TTS_MODEL": settings.mistral.tts_model,
-        "MISTRAL__VOICE_ID": settings.mistral.voice_id,
-        "MISTRAL__VOICE_ID_EN": settings.mistral.voice_id_en,
-        "MISTRAL__VOICE_ID_ES": settings.mistral.voice_id_es,
-        "MISTRAL__RESPONSE_FORMAT": settings.mistral.response_format,
-        "MISTRAL__SAMPLE_RATE_HZ": str(settings.mistral.sample_rate_hz),
+        "ELEVENLABS__API_KEY": settings.elevenlabs.api_key,
+        "ELEVENLABS__MODEL_ID": settings.elevenlabs.model_id,
+        "ELEVENLABS__VOICE_ID": settings.elevenlabs.voice_id,
+        "ELEVENLABS__VOICE_ID_EN": settings.elevenlabs.voice_id_en,
+        "ELEVENLABS__VOICE_ID_ES": settings.elevenlabs.voice_id_es,
+        "ELEVENLABS__OUTPUT_FORMAT": settings.elevenlabs.output_format,
     }
+    # Do not pin RunPod proxy pods to a specific public base URL.
+    # The proxy hostname changes on every new pod, and the app can derive
+    # the correct public host from forwarded headers at request time.
+    return env
 
 
 def build_call_center_pod_request() -> dict[str, object]:
@@ -101,7 +102,8 @@ def main() -> None:
     print()
     print("=" * 60)
     print("Recommended production values:")
-    print(f"SERVER__PUBLIC_BASE_URL={pod_url}")
+    print("# Leave SERVER__PUBLIC_BASE_URL blank for RunPod proxy pods.")
+    print("# The app will use forwarded headers to generate the correct Twilio stream URL.")
     print(f"# Twilio inbound webhook -> {pod_url}/voice/telephone/incoming")
     print("=" * 60)
 

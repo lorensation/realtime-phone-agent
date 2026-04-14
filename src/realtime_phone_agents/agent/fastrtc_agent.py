@@ -7,13 +7,14 @@ from typing import Any, AsyncIterator, List, Literal, Optional, Tuple
 from uuid import uuid4
 
 import numpy as np
-from fastrtc import ReplyOnPause, Stream
+from fastrtc import ReplyOnPause
 from fastrtc.utils import get_current_context
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import InMemorySaver
 from loguru import logger
 
+from realtime_phone_agents.agent.stream import VoiceAgentStream
 from realtime_phone_agents.agent.prompts.builder import build_system_prompt
 from realtime_phone_agents.agent.prompts.defaults import (
     DEFAULT_LANGUAGE_POLICY,
@@ -81,6 +82,8 @@ SPANISH_SELECTION_FALLBACK = "No he podido confirmar el idioma. Continuare en es
 ENGLISH_SELECTION_KEYWORDS = ("english", "ingles")
 SPANISH_SELECTION_KEYWORDS = ("espanol", "spanish", "castellano")
 _SENTENCE_SPLIT = re.compile(r"(?<=[\.\!\?])\s+")
+_MARKDOWN_BULLET = re.compile(r"^\s*(?:[-*•]|\d+\.)\s+")
+_INLINE_MARKDOWN = re.compile(r"[*_`#]+")
 
 
 def normalize_language_selection_text(text: str) -> str:
@@ -164,6 +167,25 @@ def chunk_text(text: str, max_chars: int = 240) -> list[str]:
     return chunks
 
 
+def normalize_spoken_text(text: str) -> str:
+    cleaned_lines: list[str] = []
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line = _MARKDOWN_BULLET.sub("", line)
+        line = _INLINE_MARKDOWN.sub("", line)
+        line = line.replace("•", " ")
+        line = line.replace("–", ", ")
+        line = line.replace("—", ", ")
+        line = line.replace("‑", "-")
+        cleaned_lines.append(line.strip())
+
+    normalized = " ".join(cleaned_lines)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
 @dataclass
 class CallSessionState:
     call_id: str
@@ -204,6 +226,9 @@ class FastRTCAgent:
         can_interrupt: bool = True,
     ):
         self._language_locked = language_locked
+        self._custom_system_prompt = system_prompt
+        self._custom_tools = tools
+        self._last_prompt_refresh_at = time.monotonic()
         self._stt_model = stt_model or get_stt_model(settings.stt_model)
         self._tts_model = tts_model or get_tts_model(
             settings.tts_model,
@@ -221,26 +246,13 @@ class FastRTCAgent:
         )
         self._sessions: dict[str, CallSessionState] = {}
 
-        self._react_agent = self._create_react_agent(
-            system_prompt=system_prompt,
-            tools=tools,
-            language_lock=None,
-        )
+        self._react_agent = None
         self._english_react_agent = None
         self._spanish_react_agent = None
         self._english_tts_model = None
         self._spanish_tts_model = None
+        self._refresh_react_agents(force=True)
         if self._language_selection_enabled or self._language_locked is not None:
-            self._english_react_agent = self._create_react_agent(
-                system_prompt=system_prompt,
-                tools=tools,
-                language_lock="english",
-            )
-            self._spanish_react_agent = self._create_react_agent(
-                system_prompt=system_prompt,
-                tools=tools,
-                language_lock="spanish",
-            )
             self._english_tts_model = (
                 self._tts_model
                 if tts_model is not None
@@ -304,13 +316,39 @@ class FastRTCAgent:
         setattr(agent, "_prompt_telemetry", prompt_telemetry)
         return agent
 
-    def _build_stream(self) -> Stream:
+    def _refresh_react_agents(self, *, force: bool = False) -> None:
+        refresh_interval = max(settings.prompts.refresh_interval_seconds, 0)
+        if not force and refresh_interval > 0:
+            if (time.monotonic() - self._last_prompt_refresh_at) < refresh_interval:
+                return
+        if not force:
+            build_system_prompt.cache_clear()
+
+        self._react_agent = self._create_react_agent(
+            system_prompt=self._custom_system_prompt,
+            tools=self._custom_tools,
+            language_lock=None,
+        )
+        if self._language_selection_enabled or self._language_locked is not None:
+            self._english_react_agent = self._create_react_agent(
+                system_prompt=self._custom_system_prompt,
+                tools=self._custom_tools,
+                language_lock="english",
+            )
+            self._spanish_react_agent = self._create_react_agent(
+                system_prompt=self._custom_system_prompt,
+                tools=self._custom_tools,
+                language_lock="spanish",
+            )
+        self._last_prompt_refresh_at = time.monotonic()
+
+    def _build_stream(self) -> VoiceAgentStream:
         async def handler_wrapper(audio: AudioChunk) -> AsyncIterator[AudioChunk]:
             async for chunk in self._process_audio(audio):
                 yield chunk
 
         startup_fn = self._startup_prompt if self._language_selection_enabled else None
-        return Stream(
+        return VoiceAgentStream(
             handler=ReplyOnPause(
                 handler_wrapper,
                 startup_fn=startup_fn,
@@ -330,6 +368,7 @@ class FastRTCAgent:
         call_id = self._get_call_id()
         session = self._sessions.get(call_id)
         if session is None:
+            self._refresh_react_agents()
             session = CallSessionState(call_id=call_id)
             self._sessions[call_id] = session
             if not self._language_selection_enabled:
@@ -586,7 +625,7 @@ class FastRTCAgent:
         return None
 
     async def _get_final_response(self, session: CallSessionState) -> str:
-        return session.last_final_text or session.fallback_message
+        return normalize_spoken_text(session.last_final_text or session.fallback_message)
 
     async def _synthesize_text_with_model(
         self,
@@ -620,7 +659,9 @@ class FastRTCAgent:
         text: str,
     ) -> AsyncIterator[AudioChunk]:
         tts_model = session.tts_model or self._tts_model
-        async for audio_chunk in self._synthesize_text_with_model(tts_model, text):
+        async for audio_chunk in self._synthesize_text_with_model(
+            tts_model, normalize_spoken_text(text)
+        ):
             yield audio_chunk
 
     async def _play_sound_effect(self) -> AsyncIterator[AudioChunk]:
@@ -632,7 +673,7 @@ class FastRTCAgent:
             yield effect_chunk
 
     @property
-    def stream(self) -> Stream:
+    def stream(self) -> VoiceAgentStream:
         return self._stream
 
     @property

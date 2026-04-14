@@ -46,15 +46,15 @@ The repo now defaults to external speech providers plus a deployable main app:
 
 ```env
 STT_MODEL=whisper-groq
-TTS_MODEL=mistral-voxtral
+TTS_MODEL=elevenlabs
 ```
 
 With those defaults, set these values before the voice stack can start:
 
 ```env
 GROQ__API_KEY=YOUR_GROQ_KEY_GOES_HERE
-MISTRAL__API_KEY=YOUR_MISTRAL_KEY_GOES_HERE
-MISTRAL__VOICE_ID=YOUR_MULTILINGUAL_VOICE_ID_GOES_HERE
+ELEVENLABS__API_KEY=YOUR_ELEVENLABS_KEY_GOES_HERE
+ELEVENLABS__VOICE_ID=Sp57wugtIMQc3lhms94f
 SERVER__PUBLIC_BASE_URL=https://YOUR-RUNPOD-URL.proxy.runpod.net
 ```
 
@@ -94,7 +94,7 @@ uv run python scripts/ingest_hotel_kb.py
 
 ```env
 STT_MODEL=moonshine | whisper-groq | faster-whisper
-TTS_MODEL=mistral-voxtral | kokoro | together | orpheus-runpod
+TTS_MODEL=elevenlabs | mistral-voxtral | kokoro | together | orpheus-runpod
 ```
 
 ## 5. Required keys and provider-specific settings
@@ -119,9 +119,22 @@ OPENAI__API_KEY=YOUR_OPENAI_KEY
 OPENAI__MODEL=gpt-4o-mini
 ```
 
-### Mistral Voxtral TTS
+### ElevenLabs TTS
 
 Use this as the primary production TTS path:
+
+```env
+ELEVENLABS__API_KEY=YOUR_ELEVENLABS_KEY
+ELEVENLABS__MODEL_ID=eleven_flash_v2_5
+ELEVENLABS__VOICE_ID=Sp57wugtIMQc3lhms94f
+ELEVENLABS__VOICE_ID_EN=
+ELEVENLABS__VOICE_ID_ES=
+ELEVENLABS__OUTPUT_FORMAT=pcm_16000
+```
+
+### Mistral Voxtral TTS
+
+Use this as a fallback external TTS path if you do not want to use ElevenLabs.
 
 ```env
 MISTRAL__API_KEY=YOUR_MISTRAL_KEY
@@ -134,9 +147,15 @@ MISTRAL__RESPONSE_FORMAT=pcm
 MISTRAL__SAMPLE_RATE_HZ=24000
 ```
 
+Then switch:
+
+```env
+TTS_MODEL=mistral-voxtral
+```
+
 ### Together AI
 
-Use this as a fallback external TTS path if you do not want to use Mistral.
+Use this as another fallback external TTS path.
 
 ```env
 TOGETHER__API_KEY=YOUR_TOGETHER_KEY
@@ -193,12 +212,12 @@ ORPHEUS__DEBUG=false
 
 These variables are no longer required for the primary deployment flow.
 
-### Language-selection call flow
+### Call flow
 
-To route English and Spanish callers to different TTS paths, enable the call flow:
+The production Twilio flow is a single direct connect with no language gather:
 
 ```env
-CALL_FLOW__LANGUAGE_SELECTION_ENABLED=true
+CALL_FLOW__LANGUAGE_SELECTION_ENABLED=false
 CALL_FLOW__SELECTION_RETRY_LIMIT=2
 CALL_FLOW__RINGBACK_SECONDS=2.0
 CALL_FLOW__TOOL_USE_PREAMBLE_MODE=auto
@@ -309,7 +328,7 @@ The Twilio incoming call webhook should point to the app endpoint that serves:
 /voice/telephone/incoming
 ```
 
-That route is the only public telephone entrypoint. It handles language selection and then connects Twilio to the correct media stream.
+That route is the only public telephone entrypoint. It plays a short greeting and then connects Twilio directly to `/voice/telephone/handler`.
 
 For outbound calling from an operator machine:
 
