@@ -82,7 +82,7 @@ SPANISH_SELECTION_FALLBACK = "No he podido confirmar el idioma. Continuare en es
 ENGLISH_SELECTION_KEYWORDS = ("english", "ingles")
 SPANISH_SELECTION_KEYWORDS = ("espanol", "spanish", "castellano")
 _SENTENCE_SPLIT = re.compile(r"(?<=[\.\!\?])\s+")
-_MARKDOWN_BULLET = re.compile(r"^\s*(?:[-*•]|\d+\.)\s+")
+_MARKDOWN_BULLET = re.compile(r"^\s*(?:[-*]|\d+\.)\s+")
 _INLINE_MARKDOWN = re.compile(r"[*_`#]+")
 
 
@@ -632,7 +632,7 @@ class FastRTCAgent:
         model: TTSModel,
         text: str,
     ) -> AsyncIterator[AudioChunk]:
-        segments = chunk_text(text)
+        segments = chunk_text(text, max_chars=120)
         if not segments:
             return
 

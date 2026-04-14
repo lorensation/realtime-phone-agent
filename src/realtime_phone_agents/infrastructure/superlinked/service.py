@@ -63,7 +63,8 @@ class KnowledgeSearchService:
 
     @staticmethod
     def _normalize_identifier(value: str | None) -> str:
-        normalized = unicodedata.normalize("NFKD", value or "")
+        raw_value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value or "")
+        normalized = unicodedata.normalize("NFKD", raw_value)
         normalized = "".join(
             char for char in normalized if not unicodedata.combining(char)
         )
@@ -81,9 +82,14 @@ class KnowledgeSearchService:
 
         candidate_key = self._normalize_identifier(candidate)
         aliases = {
-            self._normalize_identifier(settings.knowledge_base.default_hotel_id): settings.knowledge_base.default_hotel_id,
+            self._normalize_identifier(
+                settings.knowledge_base.default_hotel_id
+            ): settings.knowledge_base.default_hotel_id,
             self._normalize_identifier(
                 settings.knowledge_base.default_hotel_id.replace("_", " ")
+            ): settings.knowledge_base.default_hotel_id,
+            settings.knowledge_base.default_hotel_id.replace(
+                "_", ""
             ): settings.knowledge_base.default_hotel_id,
         }
 
@@ -94,6 +100,16 @@ class KnowledgeSearchService:
             aliases[self._normalize_identifier(self.bundle.manifest.property_name)] = (
                 settings.knowledge_base.default_hotel_id
             )
+            aliases[
+                self._normalize_identifier(self.bundle.hotel.property.name).replace(
+                    " ", ""
+                )
+            ] = settings.knowledge_base.default_hotel_id
+            aliases[
+                self._normalize_identifier(self.bundle.manifest.property_name).replace(
+                    " ", ""
+                )
+            ] = settings.knowledge_base.default_hotel_id
 
         return aliases.get(candidate_key, candidate)
 

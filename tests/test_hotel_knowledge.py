@@ -269,6 +269,15 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response["filters"]["hotel_id"], "blue_sardine_altea")
 
+    async def test_search_normalizes_camelcase_hotel_name_to_canonical_id(self):
+        response = await self.service.search_knowledge(
+            "Necesito la direccion del hotel",
+            hotel_id="BlueSardineAltea",
+            limit=3,
+        )
+
+        self.assertEqual(response["filters"]["hotel_id"], "blue_sardine_altea")
+
     async def test_search_normalizes_operational_section_alias(self):
         response = await self.service.search_knowledge(
             "Necesito saber los horarios de recepcion",
