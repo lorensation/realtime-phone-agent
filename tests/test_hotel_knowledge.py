@@ -49,6 +49,18 @@ class LoaderTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_knowledge_bundle(target)
 
+    def test_loader_accepts_json_line_ending_changes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "2026-04-11"
+            shutil.copytree(BUNDLE_PATH, target)
+            documents_path = target / "documents.json"
+            normalized = documents_path.read_bytes().replace(b"\r\n", b"\n")
+            documents_path.write_bytes(normalized.replace(b"\n", b"\r\n"))
+
+            bundle = load_knowledge_bundle(target)
+
+        self.assertEqual(bundle.manifest.kb_version, "2026-04-11")
+
     def test_loader_detects_unknown_room_type_reference(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             target = Path(temp_dir) / "2026-04-11"
@@ -141,6 +153,20 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
             None, None, None, None, force_in_memory=True
         )
         cls.service.ingest_knowledge_bundle(BUNDLE_PATH)
+
+    def test_qdrant_url_accepts_host_with_scheme(self):
+        service = KnowledgeSearchService(
+            "https://example.qdrant.io",
+            6333,
+            "api-key",
+            True,
+            force_in_memory=True,
+        )
+
+        self.assertEqual(
+            service._build_qdrant_url(),
+            "https://example.qdrant.io:6333",
+        )
 
     async def test_policy_search_for_pets(self):
         response = await self.service.search_knowledge("Se admiten mascotas?", limit=3)
@@ -248,6 +274,7 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
                 auto_ingest_default_bundle=False,
                 default_bundle_path=str(BUNDLE_PATH),
                 collection_name="hotel-knowledge",
+                default_hotel_id="blue_sardine_altea",
             )
         )
 

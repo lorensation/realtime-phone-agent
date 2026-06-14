@@ -1,4 +1,7 @@
 .vscode/
+.codex/
+.uv-cache/
+.uv-tools/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

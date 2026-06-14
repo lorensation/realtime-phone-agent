@@ -5,6 +5,7 @@ import re
 import unicodedata
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pandas as pd
 from loguru import logger
@@ -144,8 +145,7 @@ class KnowledgeSearchService:
             self._setup_with_memory()
 
     def _setup_with_qdrant(self) -> None:
-        protocol = "https" if self.qdrant_use_https else "http"
-        qdrant_url = f"{protocol}://{self.qdrant_host}:{self.qdrant_port}"
+        qdrant_url = self._build_qdrant_url()
 
         vector_db = sl.QdrantVectorDatabase(
             url=qdrant_url,
@@ -183,6 +183,16 @@ class KnowledgeSearchService:
         executor = sl.InMemoryExecutor(sources=[self.source], indices=[knowledge_index])
         self.app = executor.run()
         logger.info("KnowledgeSearchService initialized with InMemoryExecutor")
+
+    def _build_qdrant_url(self) -> str:
+        raw_host = (self.qdrant_host or "").strip().rstrip("/")
+        protocol = "https" if self.qdrant_use_https else "http"
+        if raw_host.startswith(("http://", "https://")):
+            parsed = urlsplit(raw_host)
+            if parsed.port is not None or self.qdrant_port is None:
+                return raw_host
+            return f"{raw_host}:{self.qdrant_port}"
+        return f"{protocol}://{raw_host}:{self.qdrant_port}"
 
     def ingest_default_bundle_if_configured(self) -> None:
         if not settings.knowledge_base.auto_ingest_default_bundle:
