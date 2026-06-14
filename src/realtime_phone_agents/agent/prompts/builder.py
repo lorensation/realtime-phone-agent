@@ -6,6 +6,8 @@ from typing import Literal
 
 from realtime_phone_agents.agent.prompts.defaults import (
     DEFAULT_LANGUAGE_POLICY,
+    HOT_CONTEXT_MARKER,
+    HOT_CONTEXT_PROMPT,
     LOCAL_PROMPT_FALLBACKS,
     LOCKED_LANGUAGE_POLICY,
 )
@@ -62,13 +64,14 @@ def build_system_prompt(language_lock: LockedLanguage = None) -> BuiltPrompt:
         if language_lock is not None
         else DEFAULT_LANGUAGE_POLICY
     )
-    prompt_text = "\n\n".join(
-        [
-            components["core"].text.strip(),
-            components["retrieval"].text.strip(),
-            components["escalation"].text.strip(),
-            components["style"].text.strip(),
-            language_policy.strip(),
-        ]
-    ).strip()
+    sections = [
+        components["core"].text.strip(),
+        components["retrieval"].text.strip(),
+        components["escalation"].text.strip(),
+        components["style"].text.strip(),
+        language_policy.strip(),
+    ]
+    if HOT_CONTEXT_MARKER not in "\n\n".join(sections):
+        sections.insert(0, HOT_CONTEXT_PROMPT.strip())
+    prompt_text = "\n\n".join(sections).strip()
     return BuiltPrompt(text=prompt_text, components=components)

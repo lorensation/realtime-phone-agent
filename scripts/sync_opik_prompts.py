@@ -5,7 +5,10 @@ import os
 
 from opik.api_objects import opik_client
 
-from realtime_phone_agents.agent.prompts.defaults import LOCAL_PROMPT_FALLBACKS
+from realtime_phone_agents.agent.prompts.defaults import (
+    HOT_CONTEXT_PROMPT,
+    LOCAL_PROMPT_FALLBACKS,
+)
 from realtime_phone_agents.config import settings
 
 
@@ -49,9 +52,12 @@ def main() -> int:
     }
 
     for key, ref in refs.items():
+        prompt_text = LOCAL_PROMPT_FALLBACKS[key]
+        if key == "core":
+            prompt_text = f"{HOT_CONTEXT_PROMPT}\n\n{prompt_text}"
         version = prompts_client.create_prompt(
             name=ref.name,
-            prompt=LOCAL_PROMPT_FALLBACKS[key],
+            prompt=prompt_text,
             metadata={"component": key, "channel": "voice", "hotel": "blue-sardine"},
             description=PROMPT_DESCRIPTIONS[key],
             change_description=args.change_description,

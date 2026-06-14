@@ -1,14 +1,25 @@
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, cast
 from urllib.parse import urlsplit
 
 from fastrtc import Stream
+from fastrtc.tracks import HandlerType, StreamHandlerImpl
+from fastrtc.websocket import WebSocketHandler
+from fastapi import WebSocket
 from fastapi.requests import Request
 from fastapi.responses import HTMLResponse
 from gradio.components.base import Component
 
 from realtime_phone_agents.config import settings
-from fastrtc.tracks import HandlerType
 from fastrtc.utils import RTCConfigurationCallable
+
+
+class TelephoneWebSocketHandler(WebSocketHandler):
+    """FastRTC 0.0.33 leaves these task fields unset on early disconnects."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.start_up_task = None
+        self._emit_to_queue_task = None
 
 
 def _configured_public_base_url() -> str | None:
@@ -125,3 +136,45 @@ class VoiceAgentStream(Stream):
         )
         response.append(connect)
         return HTMLResponse(content=str(response), media_type="application/xml")
+
+    async def telephone_handler(self, websocket: WebSocket):
+        """
+        Handle Twilio media streams with defensive cleanup for short calls.
+
+        FastRTC 0.0.33 can raise when Twilio disconnects before the `start`
+        event and does not track telephone connections in `self.connections`.
+        Tracking here lets a completed call release capacity immediately.
+        """
+        handler = cast(StreamHandlerImpl, self.event_handler.copy())  # type: ignore
+        handler.phone_mode = True
+
+        async def set_handler(stream_id: str, ws_handler: WebSocketHandler):
+            if (
+                self.concurrency_limit is not None
+                and len(self.connections) >= self.concurrency_limit
+            ):
+                await cast(WebSocket, ws_handler.websocket).send_json(
+                    {
+                        "status": "failed",
+                        "meta": {
+                            "error": "concurrency_limit_reached",
+                            "limit": self.concurrency_limit,
+                        },
+                    }
+                )
+                await websocket.close()
+                return
+
+            self.connections[stream_id] = [ws_handler]  # type: ignore
+
+        def clean_up(stream_id: str):
+            if stream_id:
+                self.connections.pop(stream_id, None)  # type: ignore
+
+        ws = TelephoneWebSocketHandler(
+            handler,
+            set_handler,
+            clean_up,
+            lambda _stream_id: lambda _outputs: None,
+        )
+        await ws.handle_websocket(websocket)

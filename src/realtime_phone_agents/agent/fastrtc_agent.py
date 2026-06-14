@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import re
 import time
@@ -7,6 +8,7 @@ from typing import Any, AsyncIterator, List, Literal, Optional, Tuple
 from uuid import uuid4
 
 import numpy as np
+from fastapi.websockets import WebSocketState
 from fastrtc import ReplyOnPause
 from fastrtc.utils import get_current_context
 from langchain.agents import create_agent
@@ -18,6 +20,7 @@ from realtime_phone_agents.agent.stream import VoiceAgentStream
 from realtime_phone_agents.agent.prompts.builder import build_system_prompt
 from realtime_phone_agents.agent.prompts.defaults import (
     DEFAULT_LANGUAGE_POLICY,
+    HOT_CONTEXT_PROMPT,
     LOCAL_PROMPT_FALLBACKS,
     LOCKED_LANGUAGE_POLICY,
 )
@@ -36,6 +39,7 @@ SelectedLanguage = Literal["english", "spanish"]
 
 DEFAULT_SYSTEM_PROMPT = "\n\n".join(
     [
+        HOT_CONTEXT_PROMPT,
         LOCAL_PROMPT_FALLBACKS["core"],
         LOCAL_PROMPT_FALLBACKS["retrieval"],
         LOCAL_PROMPT_FALLBACKS["escalation"],
@@ -50,6 +54,7 @@ SPANISH_SYSTEM_PROMPT = "\n\n".join(
     [
         "\n\n".join(
             [
+                HOT_CONTEXT_PROMPT,
                 LOCAL_PROMPT_FALLBACKS["core"],
                 LOCAL_PROMPT_FALLBACKS["retrieval"],
                 LOCAL_PROMPT_FALLBACKS["escalation"],
@@ -425,30 +430,79 @@ class FastRTCAgent:
         audio: AudioChunk,
     ) -> AsyncIterator[AudioChunk]:
         session = self._get_session()
-        transcription = await self._transcribe(audio, language=session.language)
-        logger.info(f"Transcription: {transcription}")
+        try:
+            transcription = await self._transcribe(audio, language=session.language)
+            logger.info(f"Transcription: {transcription}")
 
-        if self._language_selection_enabled and not session.language_selection_complete:
-            async for audio_chunk in self._handle_language_selection(
-                session, transcription
+            if (
+                self._language_selection_enabled
+                and not session.language_selection_complete
             ):
-                yield audio_chunk
-            return
+                async for audio_chunk in self._handle_language_selection(
+                    session, transcription
+                ):
+                    if not self._call_is_connected():
+                        logger.info(
+                            "Call {} disconnected during language selection.",
+                            session.call_id,
+                        )
+                        return
+                    yield audio_chunk
+                return
 
-        if not (transcription or "").strip():
-            logger.debug("Skipping empty transcription for call {}", session.call_id)
-            return
+            if not (transcription or "").strip():
+                logger.debug("Skipping empty transcription for call {}", session.call_id)
+                return
 
-        async for audio_chunk in self._process_with_agent(session, transcription):
-            if audio_chunk is not None:
-                yield audio_chunk
+            async for audio_chunk in self._process_with_agent(session, transcription):
+                if not self._call_is_connected():
+                    logger.info(
+                        "Call {} disconnected while processing agent output.",
+                        session.call_id,
+                    )
+                    return
+                if audio_chunk is not None:
+                    yield audio_chunk
 
-        final_response = await self._get_final_response(session)
-        logger.info(f"Final response: {final_response}")
+            if not self._call_is_connected():
+                logger.info(
+                    "Call {} disconnected before final response synthesis.",
+                    session.call_id,
+                )
+                return
 
-        if final_response:
-            async for audio_chunk in self._synthesize_speech(session, final_response):
-                yield audio_chunk
+            final_response = await self._get_final_response(session)
+            logger.info(f"Final response: {final_response}")
+
+            if final_response:
+                async for audio_chunk in self._synthesize_speech(
+                    session, final_response
+                ):
+                    if not self._call_is_connected():
+                        logger.info(
+                            "Call {} disconnected during speech synthesis.",
+                            session.call_id,
+                        )
+                        return
+                    yield audio_chunk
+        except asyncio.CancelledError:
+            session.last_final_text = None
+            logger.info("Call {} processing was cancelled.", session.call_id)
+            raise
+
+    def _call_is_connected(self) -> bool:
+        try:
+            websocket = get_current_context().websocket
+        except RuntimeError:
+            return True
+
+        if websocket is None:
+            return True
+
+        return (
+            websocket.application_state == WebSocketState.CONNECTED
+            and websocket.client_state == WebSocketState.CONNECTED
+        )
 
     async def _transcribe(
         self,
