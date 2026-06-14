@@ -112,6 +112,8 @@ SPECIAL_REQUEST_KEYWORDS = {
 }
 
 POLICY_KEYWORDS = {
+    "atencion",
+    "attended",
     "mascota",
     "mascotas",
     "pet",
@@ -131,6 +133,12 @@ POLICY_KEYWORDS = {
     "policy",
     "politica",
     "politicas",
+    "recepcion",
+    "reception",
+    "front desk",
+    "horario",
+    "horarios",
+    "hours",
     "bici",
     "bicicleta",
     "patinete",
@@ -267,6 +275,15 @@ def detect_policy_type(query: str) -> str | None:
         "cancellation": {"cancel", "cancelacion", "refund", "reembolso"},
         "payment": {"payment", "pago", "tarjeta", "card", "visa", "mastercard"},
         "mobility": {"bici", "bicicleta", "patinete", "scooter"},
+        "reservation_hours": {
+            "recepcion",
+            "reception",
+            "front desk",
+            "horario",
+            "horarios",
+            "hours",
+            "atencion",
+        },
     }
     for policy_type, keywords in mapping.items():
         if any(keyword in normalized_query for keyword in keywords):

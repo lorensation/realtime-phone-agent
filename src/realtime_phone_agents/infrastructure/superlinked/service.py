@@ -23,7 +23,6 @@ from realtime_phone_agents.knowledge import (
     detect_intent,
     extract_area_sqm_hint,
     extract_base_price_hint,
-    has_explicit_stay_dates,
     is_unverified_amenity_question,
     load_knowledge_bundle,
     normalize_knowledge_bundle,
@@ -429,19 +428,9 @@ class KnowledgeSearchService:
             notes.append(
                 "La base publica no confirma botellas de agua de cortesia. Di que no esta confirmado y ofrece telefono o email."
             )
-        if (
-            resolved_intent == Intent.AVAILABILITY_PRICING
-            and not has_explicit_stay_dates(query)
-        ):
+        if resolved_intent == Intent.AVAILABILITY_PRICING and results:
             notes.append(
-                "Pide fechas exactas antes de cotizar. Sin motor de reservas integrado, solo comparte precios orientativos."
-            )
-        if any(
-            result["verification_state"] == VerificationState.INTERNAL_UNVALIDATED.value
-            for result in results
-        ):
-            notes.append(
-                "Presenta cualquier precio interno como orientativo desde X EUR y recomienda confirmar en web o por contacto."
+                "Para precio base o disponibilidad general, responde directamente con los datos recuperados. Si el cliente quiere confirmar una reserva real, deriva al equipo de reservas o a la web."
             )
         if any(
             result["verification_state"] == VerificationState.THIRD_PARTY.value
@@ -498,9 +487,34 @@ class KnowledgeSearchService:
             if context.intent in {item.value for item in Intent}
             else detect_intent(query)
         )
+        lowered_query = query.lower()
+        booking_confirmation_request = any(
+            phrase in lowered_query
+            for phrase in (
+                "quiero reservar",
+                "reservarla",
+                "reservarlo",
+                "confirmar reserva",
+                "cerrar la reserva",
+                "book the",
+                "want to book",
+                "confirm the booking",
+            )
+        )
+        if booking_confirmation_request:
+            context.filters.room_type_id = None
+            context.filters.section = None
+            context.filters.doc_types = [
+                "faq",
+                "operational_note",
+                "structured_fact",
+                "document",
+            ]
         area_hint = extract_area_sqm_hint(query)
         price_hint = extract_base_price_hint(query)
         entity_type = self._entity_type_for_intent(resolved_intent, query)
+        if booking_confirmation_request:
+            entity_type = None
         language_filter = self._resolve_language_filter(context.filters.language)
 
         resolved_hotel_id = self._resolve_hotel_id(context.filters.hotel_id)

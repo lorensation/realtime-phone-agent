@@ -182,3 +182,4 @@ cython_debug/
 
 .gradio
 .DS_Store
+KB_STEPS.md

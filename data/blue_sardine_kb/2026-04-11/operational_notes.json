@@ -1,26 +1,26 @@
 {
   "notes": [
     {
-      "note_id": "breakfast_unknown",
-      "title": "Breakfast is not confirmed in the public source",
-      "body": "The reviewed public pages do not mention breakfast or whether it is included. The agent must not infer breakfast availability from hotel category or booking norms. Offer to confirm with the hotel by phone or email.",
-      "section": "operations",
-      "confidence": "missing_public_info",
-      "requires_handoff": true,
+      "note_id": "breakfast_not_included",
+      "title": "Breakfast is not included by default",
+      "body": "Breakfast is not included by default. The agent can say the hotel may recommend nearby cafes, but must not promise an included breakfast service.",
+      "section": "services",
+      "confidence": "confirmed",
+      "requires_handoff": false,
       "source_urls": [
-        "https://bluesardinealtea.com/"
+        "internal://operations/services"
       ],
       "tags": [
         "breakfast",
-        "unknown"
+        "services"
       ]
     },
     {
-      "note_id": "address_conflict",
-      "title": "Address discrepancy between site and booking engine",
-      "body": "The website contact page shows Calle Pescadores 1, while the booking engine pages show Calle La Mar 54. For taxi, GPS, transfers, or urgent wayfinding, the agent should not pick one confidently and should escalate for confirmation.",
+      "note_id": "address_practical_response",
+      "title": "Practical address handling",
+      "body": "For general location questions, give the public main address: Calle Pescadores 1, 03590 Altea, Alicante. If the caller needs taxi, GPS, or urgent transfer precision and mentions conflicting directions, recommend confirming with reception because Calle La Mar 54 also appears in booking-engine context.",
       "section": "operations",
-      "confidence": "conflicting_sources",
+      "confidence": "confirmed_with_conflict_note",
       "requires_handoff": true,
       "source_urls": [
         "https://bluesardinealtea.com/en/contact/",
@@ -29,22 +29,68 @@
       "tags": [
         "address",
         "taxi",
-        "conflict"
+        "location"
       ]
     },
     {
-      "note_id": "front_desk_unknown",
-      "title": "Front desk hours are not documented",
-      "body": "The public sources mention reservation department phone hours, but do not document front-desk hours or 24 hour reception. The agent should not claim there is no reception or that late arrival support exists without confirmation.",
-      "section": "operations",
-      "confidence": "missing_public_info",
-      "requires_handoff": true,
+      "note_id": "reception_hours_demo",
+      "title": "Reception and booking hours",
+      "body": "Reception or guest support runs 09:00-21:00. Phone reservations run Monday to Sunday 10:00-17:00. Online booking is available 24/7. Guests staying at the property have emergency phone support until 23:00. Do not claim 24-hour reception.",
+      "section": "policies",
+      "confidence": "confirmed",
+      "requires_handoff": false,
       "source_urls": [
-        "https://bluesardinealtea.com/en/general-conditions/"
+        "internal://operations/reception_hours"
       ],
       "tags": [
-        "front_desk",
-        "late_arrival"
+        "hours",
+        "reception",
+        "booking"
+      ]
+    },
+    {
+      "note_id": "pricing_direct_demo",
+      "title": "Direct base prices for phone demo",
+      "body": "Use base prices directly for phone answers. Do not ask for dates to give a base nightly price. Prices apply to one or two people. If the caller gives nights, multiply the nightly base price by the number of nights.",
+      "section": "pricing",
+      "confidence": "confirmed",
+      "requires_handoff": false,
+      "source_urls": [
+        "internal://pricing_inventory_internal"
+      ],
+      "tags": [
+        "pricing",
+        "guardrail"
+      ]
+    },
+    {
+      "note_id": "availability_direct_demo",
+      "title": "Direct availability for phone demo",
+      "body": "Use the current availability counts directly for general availability questions. Do not ask for dates unless the caller is trying to confirm a real booking for exact dates or payment.",
+      "section": "pricing",
+      "confidence": "confirmed",
+      "requires_handoff": false,
+      "source_urls": [
+        "internal://pricing_inventory_internal"
+      ],
+      "tags": [
+        "availability",
+        "guardrail"
+      ]
+    },
+    {
+      "note_id": "booking_final_handoff",
+      "title": "Final booking confirmation handoff",
+      "body": "The agent can help choose a room and explain current price and availability. The final reservation confirmation, payment, changes to existing bookings, and special confirmed arrangements must be handled by the reservations team or website.",
+      "section": "operations",
+      "confidence": "confirmed",
+      "requires_handoff": true,
+      "source_urls": [
+        "internal://pricing_inventory_internal"
+      ],
+      "tags": [
+        "booking",
+        "handoff"
       ]
     },
     {
@@ -65,7 +111,7 @@
     {
       "note_id": "payment_brand_unknown",
       "title": "Card brand acceptance is not documented",
-      "body": "The terms only say that a valid credit or debit card is required. They do not confirm Visa, Mastercard, or other specific brands. If the caller asks for a card brand, the agent should say that it is not confirmed and offer to verify it with the hotel.",
+      "body": "The terms only say that a valid credit or debit card is required. They do not confirm Visa, Mastercard, or other specific brands. If the caller asks for a card brand, say it is not confirmed and offer to verify it with the hotel.",
       "section": "operations",
       "confidence": "missing_public_info",
       "requires_handoff": true,
@@ -76,21 +122,6 @@
         "payment",
         "visa",
         "mastercard"
-      ]
-    },
-    {
-      "note_id": "pricing_is_orientative",
-      "title": "Internal pricing is orientative only",
-      "body": "The internal pricing file is useful for approximate guidance but not for confirmed quotes. When dates are missing, ask for exact dates first. Without a live booking engine result, speak in orientative terms only and recommend confirming online or with the hotel team.",
-      "section": "pricing",
-      "confidence": "internal_unvalidated",
-      "requires_handoff": true,
-      "source_urls": [
-        "internal://pricing_inventory_internal"
-      ],
-      "tags": [
-        "pricing",
-        "guardrail"
       ]
     }
   ]

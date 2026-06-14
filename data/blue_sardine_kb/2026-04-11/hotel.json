@@ -3,7 +3,7 @@
   "source": {
     "primary_domain": "bluesardinealtea.com",
     "retrieved_local_date": "2026-04-11",
-    "notes": "Datos extraidos del sitio oficial, condiciones generales y reporte de investigacion del hotel. El pricing sigue siendo input interno orientativo."
+    "notes": "Datos extraidos del sitio oficial, condiciones generales y reporte de investigacion del hotel. Los precios base y disponibilidad actual se mantienen para la demo telefonica."
   },
   "property": {
     "name": "Blue Sardine Altea",
@@ -49,7 +49,9 @@
     },
     "reservation_hours": {
       "phone_support": "Mon-Sun 10:00-17:00",
-      "website_booking": "24/7"
+      "website_booking": "24/7",
+      "front_desk_support": "09:00-21:00",
+      "guest_emergency_support": "hasta las 23:00 para huespedes alojados"
     },
     "payment_and_cancellation": {
       "card_required": true,
@@ -77,7 +79,9 @@
       "atencion_personalizada",
       "tecnologia_para_aperturas_y_registros",
       "informacion_turistica",
-      "celebracion_cumpleanos_aniversarios"
+      "celebracion_cumpleanos_aniversarios",
+      "soporte_recepcion",
+      "reservas_online_24_7"
     ],
     "housekeeping": [
       "servicio_de_limpieza",
@@ -91,7 +95,9 @@
       "caja_fuerte",
       "nevera_o_minibar",
       "smart_tv_en_todas_las_habitaciones",
-      "taquillas_y_almacenamiento_equipaje"
+      "taquillas_y_almacenamiento_equipaje",
+      "parking_publico_gratuito_cercano",
+      "check_in_tecnologico"
     ]
   }
 }

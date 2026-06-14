@@ -1,6 +1,29 @@
 {
   "room_types": [
     {
+      "id": "double_economic",
+      "display_name_es": "Habitacion Doble Economica",
+      "occupancy": {
+        "adults_max": 2
+      },
+      "bed": "doble",
+      "area_sqm": 14,
+      "highlights": [
+        "opcion_mas_economica",
+        "funcional_para_estancias_cortas"
+      ],
+      "features": [
+        "climatizacion_frio_calor",
+        "tv",
+        "minibar",
+        "locker",
+        "ducha",
+        "amenities_bano",
+        "secador",
+        "wifi"
+      ]
+    },
+    {
       "id": "standard_room",
       "display_name_es": "Habitacion Doble Estandar",
       "occupancy": {
@@ -163,13 +186,5 @@
       ]
     }
   ],
-  "room_type_extensions": [
-    {
-      "id": "double_economic",
-      "display_name_es": "Habitacion Doble Economica",
-      "source": "metabuscadores_otas",
-      "notes": "Aparece como tipologia en canales externos, pero no esta descrita en la web principal. Requiere ficha interna con m2, amenities, fotos y reglas.",
-      "needs_internal_validation": true
-    }
-  ]
+  "room_type_extensions": []
 }

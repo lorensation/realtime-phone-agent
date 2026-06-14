@@ -54,10 +54,10 @@
     {
       "faq_id": "faq_breakfast_unknown",
       "q": "El desayuno esta incluido?",
-      "a": "En las paginas revisadas no se menciona desayuno ni si esta incluido. Para no dar un dato incorrecto, hay que confirmarlo con el hotel.",
+      "a": "El desayuno no esta incluido por defecto. Si quiere, podemos recomendar cafeterias cercanas para desayunar en Altea.",
       "section": "services",
       "amenity_type": "breakfast",
-      "requires_handoff": true,
+      "requires_handoff": false,
       "sources": [
         "https://bluesardinealtea.com/"
       ]
@@ -76,12 +76,215 @@
     {
       "faq_id": "faq_address_conflict",
       "q": "Cual es la direccion exacta para taxi o GPS?",
-      "a": "El sitio principal muestra Calle Pescadores 1, mientras que el motor de reservas muestra Calle La Mar 54. Para evitar un error con taxi o GPS, la direccion exacta debe confirmarse con el hotel.",
+      "a": "La direccion publica principal es Calle Pescadores 1, 03590 Altea, Alicante. Si es para taxi o GPS exacto, es mejor confirmarla con recepcion porque tambien aparece una referencia de Calle La Mar en el motor de reservas.",
       "section": "operations",
       "requires_handoff": true,
       "sources": [
         "https://bluesardinealtea.com/en/contact/",
         "https://booking.obehotel.com/help?hotel=4517R55E&lang=es"
+      ]
+    },
+    {
+      "faq_id": "faq_location_main",
+      "q": "Donde esta el hotel?",
+      "a": "Blue Sardine Altea esta en Calle Pescadores 1, en Altea, cerca del mar y al inicio del casco historico.",
+      "section": "location",
+      "sources": [
+        "https://bluesardinealtea.com/en/contact/"
+      ]
+    },
+    {
+      "faq_id": "faq_location_sea_old_town",
+      "q": "Esta cerca del mar y del casco antiguo?",
+      "a": "Si, esta cerca del mar y al inicio del casco historico de Altea.",
+      "section": "location",
+      "sources": [
+        "https://bluesardinealtea.com/"
+      ]
+    },
+    {
+      "faq_id": "faq_location_airport",
+      "q": "Como llego desde el aeropuerto de Alicante?",
+      "a": "El aeropuerto de Alicante-Elche esta a unos 60 kilometros. Puede venir en transfer, bus, coche de alquiler o combinar C6 hasta Luceros y TRAM hacia Altea.",
+      "section": "location",
+      "sources": [
+        "https://bluesardinealtea.com/en/getting-to-altea-from-alicante-elche-airport-alc/"
+      ]
+    },
+    {
+      "faq_id": "faq_location_tram",
+      "q": "Esta cerca del TRAM?",
+      "a": "Si, la estacion de TRAM de Altea esta descrita a unos 200 metros del alojamiento.",
+      "section": "location",
+      "sources": [
+        "https://bluesardinealtea.com/formas-de-llegar-a-altea-desde-el-aeropuerto-de-alicante-elche/"
+      ]
+    },
+    {
+      "faq_id": "faq_hours_reception",
+      "q": "Teneis recepcion 24 horas?",
+      "a": "La atencion presencial o soporte de recepcion es de 09:00 a 21:00. Para huespedes alojados hay soporte telefonico de urgencias hasta las 23:00.",
+      "section": "policies",
+      "policy_type": "reservation_hours",
+      "sources": [
+        "internal://operations/reception_hours"
+      ]
+    },
+    {
+      "faq_id": "faq_hours_booking_phone",
+      "q": "A que hora puedo llamar para reservar?",
+      "a": "Reservas por telefono atiende todos los dias de 10:00 a 17:00. La reserva online esta disponible 24 horas.",
+      "section": "policies",
+      "policy_type": "reservation_hours",
+      "sources": [
+        "https://bluesardinealtea.com/en/general-conditions/"
+      ]
+    },
+    {
+      "faq_id": "faq_services_general",
+      "q": "Que servicios teneis?",
+      "a": "Hay wifi gratuito, climatizacion frio-calor, Smart TV, caja fuerte, nevera o minibar, taquillas, limpieza, informacion turistica y soporte de recepcion.",
+      "section": "services",
+      "sources": [
+        "https://bluesardinealtea.com/"
+      ]
+    },
+    {
+      "faq_id": "faq_services_no_pool_restaurant",
+      "q": "Hay piscina, restaurante o gimnasio?",
+      "a": "No hay piscina, spa, gimnasio ni restaurante propio. El hotel puede recomendar opciones cercanas para comer o desayunar.",
+      "section": "services",
+      "sources": [
+        "internal://operations/services"
+      ]
+    },
+    {
+      "faq_id": "faq_price_economic_room",
+      "q": "Cuanto cuesta una habitacion doble economica?",
+      "a": "La Habitacion Doble Economica cuesta 95 euros por noche, para una o dos personas.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_price_standard_room",
+      "q": "Cuanto cuesta una habitacion estandar?",
+      "a": "La Habitacion Doble Estandar cuesta 110 euros por noche, para una o dos personas.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_price_superior_room",
+      "q": "Somos dos, cuanto sale la superior?",
+      "a": "La Habitacion Doble Superior para dos personas cuesta 135 euros por noche.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_price_premium_three_nights",
+      "q": "Y tres noches en la premium?",
+      "a": "Serian 555 euros en total, porque la Premium cuesta 185 euros por noche.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_availability_general",
+      "q": "Teneis habitaciones para dos?",
+      "a": "Si, ahora mismo hay dobles economicas, estandar, superiores y una Premium con terraza disponibles.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_availability_premium_room",
+      "q": "Hay alguna habitacion con terraza disponible?",
+      "a": "Si, queda una Habitacion Premium con terraza disponible. Cuesta 185 euros por noche.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_recommend_budget",
+      "q": "Quiero la mas barata",
+      "a": "La opcion mas economica es la Habitacion Doble Economica, a 95 euros por noche.",
+      "section": "rooms",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_recommend_terrace",
+      "q": "Quiero algo con terraza",
+      "a": "Le recomiendo la Premium con terraza si quiere vistas y exterior privado, o el Estudio con Terraza si prefiere mas espacio para varios dias.",
+      "section": "rooms",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_recommend_kitchen",
+      "q": "Somos dos y queremos cocina",
+      "a": "Entonces encajan mejor el Apartamento Blue o el Apartamento Sardine. Ambos tienen 50 metros cuadrados, dormitorio, cocina, salon-comedor, ba?o y lavadora.",
+      "section": "rooms",
+      "amenity_type": "kitchen",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_occupancy_three_adults",
+      "q": "Somos tres adultos, teneis habitacion triple?",
+      "a": "Las habitaciones son para maximo dos adultos. Para tres adultos, lo mejor seria reservar dos habitaciones o a?adir un apartamento.",
+      "section": "rooms",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_booking_handoff",
+      "q": "Quiero reservarla ahora",
+      "a": "Perfecto. Puedo ayudarle a elegir la opcion, pero para dejar la reserva confirmada lo gestiona el equipo de reservas o puede hacerlo desde la web.",
+      "section": "pricing",
+      "requires_handoff": true,
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_price_standard_en",
+      "q": "How much is a standard double room?",
+      "a": "The Standard Double Room is 110 euros per night, for one or two people.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_availability_terrace_en",
+      "q": "Do you have a room with terrace available?",
+      "a": "Yes, there is one Premium room with terrace available. It is 185 euros per night.",
+      "section": "pricing",
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "faq_id": "faq_booking_premium_handoff",
+      "q": "Quiero reservar la premium ahora",
+      "a": "Perfecto, queda una Premium con terraza a 185 euros por noche. Para dejar la reserva confirmada, lo gestiona el equipo de reservas o puede hacerlo desde la web.",
+      "section": "pricing",
+      "requires_handoff": true,
+      "sources": [
+        "internal://pricing_inventory_internal"
       ]
     }
   ]

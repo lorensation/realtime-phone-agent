@@ -334,7 +334,9 @@ def _normalize_policy_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEnt
             title="Horario de reservas",
             body=(
                 f"Atencion telefonica: {policies.reservation_hours.phone_support}. "
-                f"Reservas web: {policies.reservation_hours.website_booking}."
+                f"Reservas web: {policies.reservation_hours.website_booking}. "
+                f"Soporte de recepcion: {policies.reservation_hours.front_desk_support or 'no documentado'}. "
+                f"Urgencias de huespedes alojados: {policies.reservation_hours.guest_emergency_support or 'no documentado'}."
             ),
             entity_type="policy",
             section="policies",
@@ -475,23 +477,22 @@ def _normalize_pricing_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
         _build_entry(
             bundle=bundle,
             entry_id="pricing_summary",
-            title="Precios orientativos e inventario interno",
+            title="Precios base y disponibilidad actual",
             body=(
-                "Los precios base internos son orientativos, pueden variar por temporada "
-                "y ocupacion, y requieren confirmacion final. La configuracion interna "
-                f"actual suma {pricing.inventory_sum_units} unidades y mantiene una "
-                f"discrepancia interna de {pricing.inventory_gap_units} unidad frente a "
-                "la referencia externa de 21."
+                "Los precios base son por noche para una o dos personas. Todas las "
+                "habitaciones admiten un maximo de 2 adultos. La disponibilidad actual "
+                f"para la demo suma {pricing.inventory_sum_units} unidades. Para confirmar "
+                "una reserva real, el cierre lo gestiona el equipo de reservas o la web."
             ),
             entity_type="pricing",
             section="pricing",
             doc_type="structured_fact",
             source_url="internal://pricing_inventory_internal",
             source_type="internal_config",
-            source_priority=SourcePriority.INTERNAL_UNVALIDATED,
-            verification_state=VerificationState.INTERNAL_UNVALIDATED,
-            confidence="orientative",
-            requires_handoff=True,
+            source_priority=SourcePriority.INTERNAL_VALIDATED,
+            verification_state=VerificationState.INTERNAL_VALIDATED,
+            confidence="confirmed",
+            requires_handoff=False,
             tags=["pricing", "inventory"],
         )
     ]
@@ -501,24 +502,25 @@ def _normalize_pricing_entries(bundle: HotelKnowledgeBundle) -> list[KnowledgeEn
             _build_entry(
                 bundle=bundle,
                 entry_id=f"pricing_{item.room_type_id}",
-                title=f"Precio orientativo {room_display_names[item.room_type_id]}",
+                title=f"Precio y disponibilidad {room_display_names[item.room_type_id]}",
                 body=(
-                    f"Precio base interno orientativo desde {item.base_price_eur} EUR "
-                    f"para {room_display_names[item.room_type_id]}. Configuracion "
-                    f"actual: {item.units} unidades. Dato interno pendiente de "
-                    "validacion y sujeto a temporada y ocupacion."
+                    f"{room_display_names[item.room_type_id]} cuesta {item.base_price_eur} "
+                    "EUR por noche para una o dos personas. "
+                    f"Disponibilidad actual: {item.units} "
+                    f"{'unidad' if item.units == 1 else 'unidades'} disponible"
+                    f"{'' if item.units == 1 else 's'}."
                 ),
                 entity_type="pricing",
                 section="pricing",
                 doc_type="structured_fact",
                 source_url="internal://pricing_inventory_internal",
                 source_type="internal_config",
-                source_priority=SourcePriority.INTERNAL_UNVALIDATED,
-                verification_state=VerificationState.INTERNAL_UNVALIDATED,
+                source_priority=SourcePriority.INTERNAL_VALIDATED,
+                verification_state=VerificationState.INTERNAL_VALIDATED,
                 room_type_id=item.room_type_id,
                 base_price_eur=item.base_price_eur,
-                confidence="orientative",
-                requires_handoff=True,
+                confidence="confirmed",
+                requires_handoff=False,
                 tags=["pricing", item.room_type_id],
             )
         )

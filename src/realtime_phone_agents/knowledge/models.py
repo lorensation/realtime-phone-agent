@@ -88,6 +88,8 @@ class DamagesFeesEur(StrictModel):
 class ReservationHours(StrictModel):
     phone_support: str
     website_booking: str
+    front_desk_support: str | None = None
+    guest_emergency_support: str | None = None
 
 
 class NonRefundablePolicy(StrictModel):

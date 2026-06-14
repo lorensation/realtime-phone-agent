@@ -24,7 +24,7 @@
       "doc_id": "bs_services_es",
       "language": "es-ES",
       "title": "Servicios, limpieza y equipamiento",
-      "body": "Servicios destacados: atencion personalizada, apoyo tecnologico para aperturas y registros, informacion turistica y opciones para celebraciones. Limpieza: servicio de limpieza, amenities, toallas, sabanas y almohadas confortables. Equipamiento: wifi gratuito, climatizacion frio-calor, caja fuerte, nevera o minibar, Smart TV, taquillas y almacenamiento de equipaje.",
+      "body": "Servicios destacados: atencion personalizada, soporte de recepcion, apoyo tecnologico para aperturas y registros, informacion turistica y celebraciones sencillas bajo peticion. Limpieza: servicio de limpieza, amenities, toallas, sabanas y almohadas confortables. Equipamiento: wifi gratuito, climatizacion frio-calor, caja fuerte, nevera o minibar, Smart TV, taquillas, guardaequipaje y parking publico gratuito cercano. No hay restaurante propio, piscina, spa ni gimnasio; el desayuno no esta incluido por defecto y se pueden recomendar cafeterias cercanas.",
       "metadata": {
         "source_priority": "official",
         "source_urls": [
@@ -65,7 +65,7 @@
       "doc_id": "bs_policies_es",
       "language": "es-ES",
       "title": "Condiciones generales: horarios y normas",
-      "body": "Check-in a partir de las 15:00 y check-out antes de las 12:00. Hay taquillas gratuitas para equipaje y un sistema para dejar llaves. Alojamiento orientado a adultos y ninos mayores de 10. Espacio sin humo. No se permiten mascotas. No se permiten bicicletas ni patinetes electricos dentro. Se aplican cargos por danos o perdida, por ejemplo toallas.",
+      "body": "Check-in a partir de las 15:00 y check-out antes de las 12:00. Reservas por telefono de lunes a domingo de 10:00 a 17:00; reservas online 24/7. Atencion presencial o soporte de recepcion de 09:00 a 21:00, y soporte telefonico de urgencias para huespedes alojados hasta las 23:00. Hay taquillas gratuitas para equipaje y sistema para dejar llaves. Alojamiento orientado a adultos y ninos mayores de 10. Espacio sin humo. No se permiten mascotas ni bicicletas o patinetes electricos dentro.",
       "metadata": {
         "source_priority": "official",
         "source_urls": [
@@ -120,6 +120,106 @@
           "nearby",
           "old_town",
           "activities"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_pricing_availability_es",
+      "language": "es-ES",
+      "title": "Precios base por noche y disponibilidad actual",
+      "body": "Precios base por noche para una o dos personas: Habitacion Doble Economica 95 EUR, Habitacion Doble Estandar 110 EUR, Habitacion Doble Superior 135 EUR, Habitacion Doble con Terraza o Premium 185 EUR, Estudio con Terraza 195 EUR, Apartamento Blue 215 EUR y Apartamento Sardine 230 EUR. Disponibilidad actual: 2 economicas, 5 estandar, 3 superiores, 1 Premium con terraza, 1 estudio con terraza, 1 Apartamento Blue y 1 Apartamento Sardine. Para reservar definitivamente, la confirmacion final la gestiona el equipo de reservas o la web.",
+      "metadata": {
+        "source_priority": "internal_validated",
+        "source_urls": [
+          "internal://pricing_inventory_internal"
+        ],
+        "source_type": "internal_config",
+        "section": "pricing",
+        "doc_type": "document",
+        "tags": [
+          "pricing",
+          "availability",
+          "rooms"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_room_recommendations_es",
+      "language": "es-ES",
+      "title": "Recomendaciones de habitacion segun preferencia",
+      "body": "Para la opcion mas economica, recomendar Habitacion Doble Economica. Para equilibrio de precio y comodidad, recomendar Habitacion Doble Estandar o Superior. Para terraza y vistas, recomendar la Premium con terraza. Para estancias largas, recomendar Estudio con Terraza por sus 30 m2 y microondas. Para cocina, salon-comedor y lavadora, recomendar Apartamento Blue o Apartamento Sardine. Para la mejor experiencia, recomendar Premium con terraza si prioriza vistas o Apartamento Sardine si prioriza espacio.",
+      "metadata": {
+        "source_priority": "internal_validated",
+        "source_urls": [
+          "internal://pricing_inventory_internal"
+        ],
+        "source_type": "internal_config",
+        "section": "rooms",
+        "doc_type": "document",
+        "tags": [
+          "recommendation",
+          "rooms",
+          "pricing"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_occupancy_rules_es",
+      "language": "es-ES",
+      "title": "Reglas de ocupacion y precios por personas",
+      "body": "El precio base de cada tipologia aplica igual para una o dos personas. Todas las habitaciones y apartamentos admiten maximo 2 adultos. Si preguntan por mas de dos adultos, no inventar habitaciones triples: recomendar dos habitaciones o una habitacion adicional. Si preguntan por ninos, mantener la politica de ninos mayores de 10 anos.",
+      "metadata": {
+        "source_priority": "internal_validated",
+        "source_urls": [
+          "internal://pricing_inventory_internal"
+        ],
+        "source_type": "internal_config",
+        "section": "rooms",
+        "doc_type": "document",
+        "tags": [
+          "occupancy",
+          "children",
+          "pricing"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_hours_demo_es",
+      "language": "es-ES",
+      "title": "Horarios de atencion y reservas",
+      "body": "Atencion presencial o soporte de recepcion: 09:00-21:00. Reservas por telefono: lunes a domingo, 10:00-17:00. Reservas online: disponible 24/7. Urgencias de huespedes alojados: soporte telefonico hasta las 23:00. No presentar recepcion 24 horas.",
+      "metadata": {
+        "source_priority": "internal_validated",
+        "source_urls": [
+          "internal://operations/reception_hours"
+        ],
+        "source_type": "internal_operational_note",
+        "section": "policies",
+        "doc_type": "document",
+        "tags": [
+          "hours",
+          "reception",
+          "booking"
+        ]
+      }
+    },
+    {
+      "doc_id": "bs_pricing_availability_en",
+      "language": "en-US",
+      "title": "Base prices and current availability",
+      "body": "Base nightly prices for one or two people: Economic Double Room 95 EUR, Standard Double Room 110 EUR, Superior Double Room 135 EUR, Premium room with terrace 185 EUR, Studio with Terrace 195 EUR, Blue Apartment 215 EUR, Sardine Apartment 230 EUR. Current availability: 2 economic, 5 standard, 3 superior, 1 Premium with terrace, 1 studio with terrace, 1 Blue Apartment and 1 Sardine Apartment. Final booking confirmation is handled by the reservations team or the website.",
+      "metadata": {
+        "source_priority": "internal_validated",
+        "source_urls": [
+          "internal://pricing_inventory_internal"
+        ],
+        "source_type": "internal_config",
+        "section": "pricing",
+        "doc_type": "document",
+        "tags": [
+          "english",
+          "pricing",
+          "availability"
         ]
       }
     }

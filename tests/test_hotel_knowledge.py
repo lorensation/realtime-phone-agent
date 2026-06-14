@@ -30,12 +30,17 @@ class LoaderTests(unittest.TestCase):
         self.assertEqual(bundle.manifest.kb_version, "2026-04-11")
         self.assertEqual(
             bundle.pricing_inventory.pricing_and_inventory_internal.inventory_gap_units,
-            1,
+            0,
         )
         self.assertIn("standard_room", bundle.all_room_type_ids)
         self.assertIn("double_economic", bundle.all_room_type_ids)
-        self.assertEqual(len(bundle.dialogues.dialogues), 8)
-        self.assertEqual(len(bundle.operational_notes.notes), 6)
+        self.assertGreaterEqual(len(bundle.faq.faq), 23)
+        self.assertGreaterEqual(len(bundle.dialogues.dialogues), 20)
+        self.assertGreaterEqual(len(bundle.operational_notes.notes), 8)
+        self.assertEqual(
+            bundle.hotel.policies.reservation_hours.front_desk_support,
+            "09:00-21:00",
+        )
 
     def test_loader_detects_manifest_checksum_mismatch(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -93,14 +98,16 @@ class NormalizationTests(unittest.TestCase):
         self.assertIn("policy_pets", ids)
         self.assertIn("pricing_standard_room", ids)
         self.assertIn("dialogue_D09", ids)
-        self.assertIn("operational_note_address_conflict", ids)
+        self.assertIn("operational_note_address_practical_response", ids)
         self.assertTrue(
             any(entry.doc_type == "faq" and entry.faq_id == "faq_parking" for entry in entries)
         )
         self.assertTrue(
             any(
                 entry.id == "pricing_standard_room"
-                and entry.verification_state.value == "internal_unvalidated"
+                and entry.verification_state.value == "internal_validated"
+                and entry.base_price_eur == 110
+                and not entry.requires_handoff
                 for entry in entries
             )
         )
@@ -108,7 +115,7 @@ class NormalizationTests(unittest.TestCase):
             any(
                 entry.id == "dialogue_D16"
                 and entry.doc_type == "dialogue_exemplar"
-                and entry.requires_handoff
+                and not entry.requires_handoff
                 for entry in entries
             )
         )
@@ -203,21 +210,56 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    async def test_pricing_guardrail_requires_dates(self):
+    async def test_pricing_answers_directly_without_dates(self):
         response = await self.service.search_knowledge(
             "How much is the studio with terrace?", limit=3
         )
         self.assertEqual(response["resolved_intent"], Intent.AVAILABILITY_PRICING.value)
-        self.assertTrue(
+        self.assertFalse(
             any("Pide fechas exactas" in note for note in response["guardrail_notes"])
         )
         self.assertTrue(
             any(
                 item["room_type_id"] == "studio_with_terrace"
-                and item["verification_state"] == "internal_unvalidated"
+                and item["verification_state"] == "internal_validated"
+                and item["base_price_eur"] == 195
                 for item in response["results"]
             )
         )
+
+    async def test_availability_search_returns_demo_counts(self):
+        response = await self.service.search_knowledge(
+            "Hay alguna habitacion con terraza disponible?", limit=5
+        )
+        self.assertEqual(response["resolved_intent"], Intent.AVAILABILITY_PRICING.value)
+        bodies = " ".join(item["body"] for item in response["results"])
+        self.assertIn("185", bodies)
+        self.assertIn("1", bodies)
+        self.assertTrue(
+            any(
+                item["room_type_id"] == "premium_room"
+                and item["base_price_eur"] == 185
+                and not item["requires_handoff"]
+                for item in response["results"]
+            )
+        )
+
+    async def test_reception_hours_search_returns_demo_hours(self):
+        response = await self.service.search_knowledge(
+            "Teneis recepcion 24 horas?", limit=5
+        )
+        bodies = " ".join(item["body"] for item in response["results"])
+        self.assertIn("09:00", bodies)
+        self.assertIn("21:00", bodies)
+        self.assertIn("23:00", bodies)
+
+    async def test_booking_confirmation_still_requires_handoff(self):
+        response = await self.service.search_knowledge(
+            "Quiero reservar la premium ahora", limit=5
+        )
+        bodies = " ".join(item["body"] for item in response["results"]).lower()
+        self.assertIn("reserva confirmada", bodies)
+        self.assertTrue(any(item["requires_handoff"] for item in response["results"]))
 
     async def test_nearby_area_retrieval(self):
         response = await self.service.search_knowledge(
@@ -227,13 +269,13 @@ class KnowledgeSearchServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("casco antiguo", bodies.lower())
         self.assertIn("kayak", bodies.lower())
 
-    async def test_breakfast_unknown_marks_requires_handoff(self):
+    async def test_breakfast_not_included_does_not_require_handoff(self):
         response = await self.service.search_knowledge(
             "El desayuno esta incluido?", limit=3
         )
-        self.assertTrue(any(item["requires_handoff"] for item in response["results"]))
+        self.assertFalse(any(item["requires_handoff"] for item in response["results"]))
         self.assertTrue(
-            any("no se menciona desayuno" in item["body"].lower() for item in response["results"])
+            any("no esta incluido" in item["body"].lower() for item in response["results"])
         )
 
     async def test_accessibility_unknown_marks_requires_handoff(self):

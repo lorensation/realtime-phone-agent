@@ -84,12 +84,11 @@
       "language": "es-ES",
       "intent": "front_desk_hours",
       "difficulty": "hard",
-      "requires_handoff": true,
-      "body": "Caller: Teneis recepcion 24 horas? Agent: En la web no se detallan horarios de recepcion; solo se indica horario del departamento de reservas por telefono, de 10 a 17. Agent: Para confirmar el soporte fuera de horario, hay que consultarlo con el hotel.",
+      "requires_handoff": false,
+      "body": "Caller: Teneis recepcion 24 horas? Agent: No es recepcion 24 horas. El soporte de recepcion es de 09:00 a 21:00, y para huespedes alojados hay urgencias telefonicas hasta las 23:00.",
       "tags": [
         "front_desk",
-        "unknown",
-        "handoff"
+        "hours"
       ],
       "sources": [
         "internal://bluesardine-kb-deepresearch-report"
@@ -123,6 +122,208 @@
       ],
       "sources": [
         "internal://bluesardine-kb-deepresearch-report"
+      ]
+    },
+    {
+      "dialogue_id": "D29",
+      "language": "es-ES",
+      "intent": "price_standard_direct",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Cuanto cuesta una doble estandar? Agent: La doble estandar cuesta 110 euros por noche, para una o dos personas.",
+      "tags": [
+        "pricing",
+        "standard_room"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D30",
+      "language": "es-ES",
+      "intent": "price_superior_two_people",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Somos dos, cuanto sale la superior? Agent: La doble superior para dos personas cuesta 135 euros por noche.",
+      "tags": [
+        "pricing",
+        "superior_room"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D31",
+      "language": "es-ES",
+      "intent": "price_premium_total",
+      "difficulty": "medium",
+      "requires_handoff": false,
+      "body": "Caller: Y tres noches en la premium? Agent: Serian 555 euros en total, porque la Premium cuesta 185 euros por noche.",
+      "tags": [
+        "pricing",
+        "premium_room",
+        "calculation"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D32",
+      "language": "es-ES",
+      "intent": "availability_general",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Teneis habitacion para dos? Agent: Si, ahora mismo tenemos dobles economicas, estandar, superiores y una Premium con terraza disponibles.",
+      "tags": [
+        "availability",
+        "rooms"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D33",
+      "language": "es-ES",
+      "intent": "availability_terrace",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Hay alguna con terraza? Agent: Si, queda una Premium con terraza, a 185 euros por noche. Tambien queda un Estudio con Terraza a 195 euros.",
+      "tags": [
+        "availability",
+        "terrace"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D34",
+      "language": "es-ES",
+      "intent": "booking_confirmation_handoff",
+      "difficulty": "medium",
+      "requires_handoff": true,
+      "body": "Caller: Vale, quiero reservar la premium. Agent: Perfecto, queda una Premium con terraza a 185 euros por noche. Para dejar la reserva confirmada, lo gestiona el equipo de reservas o puede hacerlo desde la web.",
+      "tags": [
+        "booking",
+        "handoff",
+        "premium_room"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D35",
+      "language": "es-ES",
+      "intent": "recommend_terrace",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Quiero algo bonito, con terraza si puede ser. Agent: Entonces le recomiendo la Premium con terraza. Tiene terraza independiente, vistas al mar y al casco antiguo, y cuesta 185 euros por noche.",
+      "tags": [
+        "rooms",
+        "recommendation",
+        "terrace"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D36",
+      "language": "es-ES",
+      "intent": "recommend_long_stay",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Voy a estar varios dias, que me recomiendas? Agent: Para varios dias le recomendaria el Estudio con Terraza, porque tiene 30 metros cuadrados y microondas. Cuesta 195 euros por noche.",
+      "tags": [
+        "rooms",
+        "recommendation",
+        "long_stay"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D37",
+      "language": "es-ES",
+      "intent": "recommend_kitchen",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Somos dos y queremos cocina. Agent: Entonces miraria el Apartamento Blue o el Sardine. Tienen dormitorio, cocina, salon-comedor, bano y lavadora.",
+      "tags": [
+        "rooms",
+        "kitchen",
+        "apartment"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D38",
+      "language": "es-ES",
+      "intent": "interruption_price_change",
+      "difficulty": "medium",
+      "requires_handoff": false,
+      "body": "Caller: Cuanto cuesta la superior? Agent: La superior cuesta 135 euros por noche. Caller: Perdona, la barata. Agent: Claro, la mas barata es la doble economica, a 95 euros por noche.",
+      "tags": [
+        "pricing",
+        "interruption"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D39",
+      "language": "es-ES",
+      "intent": "hours_night_support",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Me atienden por la noche? Agent: La recepcion da soporte de 09:00 a 21:00. Para huespedes alojados hay soporte telefonico de urgencias hasta las 23:00.",
+      "tags": [
+        "hours",
+        "reception"
+      ],
+      "sources": [
+        "internal://operations/reception_hours"
+      ]
+    },
+    {
+      "dialogue_id": "D40",
+      "language": "en-US",
+      "intent": "english_price_availability",
+      "difficulty": "easy",
+      "requires_handoff": false,
+      "body": "Caller: Do you have a standard double available? Agent: Yes, we currently have standard double rooms available. They are 110 euros per night for one or two people.",
+      "tags": [
+        "english",
+        "pricing",
+        "availability"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
+      ]
+    },
+    {
+      "dialogue_id": "D41",
+      "language": "en-US",
+      "intent": "english_booking_handoff",
+      "difficulty": "medium",
+      "requires_handoff": true,
+      "body": "Caller: I want to book the room with terrace. Agent: Perfect, there is one Premium room with terrace at 185 euros per night. To confirm the booking, the reservations team or the website will handle the final step.",
+      "tags": [
+        "english",
+        "booking",
+        "handoff"
+      ],
+      "sources": [
+        "internal://pricing_inventory_internal"
       ]
     }
   ]

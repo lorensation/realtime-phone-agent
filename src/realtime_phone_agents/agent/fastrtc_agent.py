@@ -317,7 +317,11 @@ class FastRTCAgent:
         return agent
 
     def _refresh_react_agents(self, *, force: bool = False) -> None:
-        refresh_interval = max(settings.prompts.refresh_interval_seconds, 0)
+        prompts_settings = getattr(settings, "prompts", None)
+        refresh_interval = max(
+            getattr(prompts_settings, "refresh_interval_seconds", 300),
+            0,
+        )
         if not force and refresh_interval > 0:
             if (time.monotonic() - self._last_prompt_refresh_at) < refresh_interval:
                 return
@@ -632,7 +636,7 @@ class FastRTCAgent:
         model: TTSModel,
         text: str,
     ) -> AsyncIterator[AudioChunk]:
-        segments = chunk_text(text, max_chars=120)
+        segments = chunk_text(text, max_chars=160)
         if not segments:
             return
 
